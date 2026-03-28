@@ -125,8 +125,11 @@ For bulk enrichment sessions (processing notes, finding connections, creating at
 2. Task `status` must be `queued`
 3. `available_from` must be today or earlier (if set)
 4. `business-hours` context tasks only surface Mon–Fri 8am–5pm Pacific
-5. Sort: soonest `goal_date` first, then shortest `duration`
-6. Surface **one task only**
+5. Tasks surfaced within the last 2 hours are skipped — pick the next eligible one
+6. Sort: soonest `goal_date` first, then shortest `duration`
+7. Surface **one task only**
+
+A task will re-surface after 2 hours if ignored. Tapping Snooze also holds it for 2 hours. Tapping Done or Defer removes it from the queue permanently (until status is reset).
 
 ---
 

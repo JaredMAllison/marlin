@@ -89,7 +89,8 @@ tags: [task, queued]   # required, must include type and status
 Status transitions:
 - `queued` → `done` (Done action): adds `completed: YYYY-MM-DD`
 - `queued` → `deferred` (Defer action): adds `deferred_until: tomorrow`
-- Snooze: no vault write, state.json tracks snooze_until
+- Snooze: no vault write, state.json tracks `snooze_until` (checked on each run)
+- Ignore: task re-surfaces after 2-hour cooldown; `last_surfaced_task` + `last_surfaced_at` tracked in state.json
 
 ---
 
@@ -116,7 +117,7 @@ Both services require these environment variables (set in systemd service files)
 
 ## Planned / not built yet
 
-- **Snooze enforcement** — state.json tracks snooze_until but marlin.py doesn't check it yet
+- **Snooze enforcement** — implemented; marlin.py checks snooze_until on each run
 - **Recurring task reset** — when a recurring task is marked done, nothing re-queues it yet
 - **WireGuard** — webhook currently only works on home WiFi; update MARLIN_WEBHOOK_BASE to WG address when set up
 - **Phase 2: Claude queries** — active natural language queries against the vault ("what can I do in 15 min?")
