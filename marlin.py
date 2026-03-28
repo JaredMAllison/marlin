@@ -9,7 +9,7 @@ import os
 import sys
 import urllib.request
 import urllib.error
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import yaml
@@ -173,6 +173,21 @@ def send_notification(task: dict):
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
+def recently_surfaced(task: dict, state: dict, cooldown_hours: int = 2) -> bool:
+    """Return True if this task was surfaced within the cooldown window."""
+    last_title = state.get("last_surfaced_task")
+    last_time = state.get("last_surfaced_at")
+    if not last_title or not last_time:
+        return False
+    if task.get("title") != last_title:
+        return False
+    try:
+        surfaced_at = datetime.fromisoformat(last_time)
+    except ValueError:
+        return False
+    return datetime.now() - surfaced_at < timedelta(hours=cooldown_hours)
+
+
 def main():
     if not NTFY_TOPIC:
         print("MARLIN_NTFY_TOPIC not set.", file=sys.stderr)
@@ -185,18 +200,38 @@ def main():
         print("Deep work — surfacing nothing.")
         sys.exit(0)
 
+    # Check snooze
+    snooze_until = state.get("snooze_until")
+    if snooze_until:
+        try:
+            if datetime.now() < datetime.fromisoformat(snooze_until):
+                print(f"Snoozed until {snooze_until} — surfacing nothing.")
+                sys.exit(0)
+        except ValueError:
+            pass
+
     tasks = load_tasks()
     eligible = [
         t for t in tasks
-        if context_compatible(t, mode) and passes_business_hours(t) and is_available_today(t)
+        if context_compatible(t, mode)
+        and passes_business_hours(t)
+        and is_available_today(t)
+        and not recently_surfaced(t, state)
     ]
 
     if not eligible:
-        print("No eligible tasks.")
+        print("No eligible tasks (all recently surfaced or none queued).")
         sys.exit(0)
 
     eligible.sort(key=sort_key)
-    send_notification(eligible[0])
+    chosen = eligible[0]
+
+    # Record what we surfaced
+    state["last_surfaced_task"] = chosen.get("title")
+    state["last_surfaced_at"] = datetime.now().isoformat()
+    save_state(state)
+
+    send_notification(chosen)
 
 if __name__ == "__main__":
     main()
