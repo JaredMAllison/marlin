@@ -2,9 +2,11 @@
 
 ## What this is
 
-Marlin is a context-aware task surfacing engine. It reads an Obsidian vault of markdown task notes, filters them by the operator's current state and context, and sends one notification to their Android phone via Ntfy. Notification actions (Done/Defer/Snooze) write back to the vault.
+Marlin is an **executive brain** — a persistent external cognitive system for an operator with ADHD and Autism. It holds more than tasks: it stores insights, observed patterns, concepts, and mental models alongside actionable work. The vault is the operator's second mind.
 
-The operator has ADHD and Autism. Every decision should reduce cognitive load, not add to it. When in doubt: simpler, quieter, less.
+The task surfacing engine (marlin.py) is one layer of this: it reads the vault, filters by context and state, and delivers one notification at a time to the operator's phone. But the vault itself is broader — a living record of what the operator knows, notices, and needs to act on.
+
+Every decision should reduce cognitive load, not add to it. When in doubt: simpler, quieter, less.
 
 ---
 
@@ -67,6 +69,25 @@ No root required. Services start on login, restart on failure, log to journald.
 
 ## Vault schema
 
+Vault structure:
+- `Tasks/` — task notes (surfaced by marlin.py)
+- `Projects/` — project notes
+- `Learning/` — coding principles and concepts captured during sessions (not surfaced)
+- `Insights/` — short philosophy fragments, atomic ideas (not surfaced)
+- `Daily/` — daily notes (YYYY-MM-DD.md)
+- `Essays/` — long-form opinions, worldview, beliefs (not surfaced)
+- `People/` — relationship notes, who people are to the operator (not surfaced)
+- `Reading/` — books/media/games with commentary (not surfaced)
+- `Decisions/` — architectural decision records; new ADRs go here before code is written (not surfaced)
+- `Home.md` — entry point for future readers, written by the operator
+- `_workflow.md` — data flow documentation (capture → inbox → enrich → permanent note → daily)
+- `Inbox.md` — unprocessed capture (all content types land here first)
+- `_ttf.md` — TTF integration config
+
+**ADR practice:** Any significant architectural decision gets an ADR in `Decisions/` before the code is written. Format: `PROJECT-ADR-NNN-short-title.md`. See `~/.claude/CLAUDE.md` for the full standard.
+
+**Content philosophy:** Marlin is not only a directive store. Insights, noted patterns, and concepts belong here too — they are the context that makes the tasks meaningful. The surfacing engine only touches Tasks/; everything else is reference and memory.
+
 Tasks at `/home/jared/Documents/Obsidian/Marlin/Tasks/*.md`:
 
 ```yaml
@@ -83,6 +104,7 @@ duration: short        # short | medium | long
 duration_minutes: 45   # optional, exact estimate
 recurrence: weekly     # optional
 tags: [task, queued]   # required, must include type and status
+ttf_id: uuid           # optional, written by /ttf-push — do not remove manually
 ---
 ```
 
@@ -125,9 +147,23 @@ Both services require these environment variables (set in systemd service files)
 
 ---
 
+## TTF integration
+
+Marlin pushes tasks to [The Time Factory](https://github.com/UBR-JMA/the-time-factory) (TTF), a visual calendar tool, via its REST API. The integration is one-way: Marlin is the source of truth; TTF edits do not write back to the vault.
+
+- **Config:** `/home/jared/Documents/Obsidian/Marlin/_ttf.md` — frontmatter field `ttf_base_url: http://localhost:3000`
+- **Push:** `/ttf-push` skill POSTs a task to `POST /api/events`; writes the returned TTF ID back to the task as `ttf_id`
+- **Update:** Subsequent `/ttf-push` calls use `PUT /api/events/:id` (keyed off `ttf_id`)
+- **`ttf_id` is a reserved field** — removing it causes a duplicate balloon on the next push
+- Tasks with no `goal_date` are skipped (TTF needs a date to place the balloon)
+
+---
+
 ## Companion skills (in ~/.claude/skills/)
 
 - `/marlin-capture` — guided task/project note creation with frontmatter validation
-- `/obsidian-enrich` — structured enrichment session (intake → scan → connections → approval → write)
+- `/marlin-enrich` — structured enrichment session (intake → scan → connections → approval → write)
+- `/ttf-push` — push a task (or all queued tasks) to The Time Factory via REST API; writes `ttf_id` back to frontmatter
+- `/marlin-learn` — capture a coding principle or concept learned during a session as a brief vault note
 
-Reference files for obsidian-enrich live in `~/.claude/skills/obsidian-enrich/references/`.
+Reference files for marlin-enrich live in `~/.claude/skills/marlin-enrich/references/`.
