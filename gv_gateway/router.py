@@ -1,5 +1,4 @@
 from datetime import datetime
-from pathlib import Path
 from gv_gateway import keys, notify
 
 
