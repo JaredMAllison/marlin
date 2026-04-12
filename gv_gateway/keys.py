@@ -1,4 +1,5 @@
-import random
+import os
+import secrets
 import smtplib
 from datetime import date
 from email.message import EmailMessage
@@ -20,9 +21,11 @@ def _load_words(dict_path: Path = DICT_PATH) -> list[str]:
 
 def generate_key(dict_path: Path = DICT_PATH, key_path: Path = KEY_PATH) -> str:
     words = _load_words(dict_path)
-    word = random.choice(words)
+    word = secrets.choice(words)
     key_path.parent.mkdir(parents=True, exist_ok=True)
-    key_path.write_text(word)
+    fd = os.open(key_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        f.write(word)
     return word
 
 

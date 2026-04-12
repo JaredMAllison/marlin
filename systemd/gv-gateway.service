@@ -9,6 +9,8 @@ ExecStart=/usr/bin/python3 -m gv_gateway.main
 WorkingDirectory=/home/jared/marlin
 Restart=always
 RestartSec=10
+Environment=DISPLAY=:0
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1001/bus
 
 [Install]
 WantedBy=default.target
