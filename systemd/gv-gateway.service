@@ -1,0 +1,14 @@
+[Unit]
+Description=Marlin GV Gateway — IMAP polling
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 -m gv_gateway.main
+WorkingDirectory=/home/jared/marlin
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

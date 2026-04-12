@@ -1,0 +1,7 @@
+[Unit]
+Description=Marlin GV Key Rotation
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 -m gv_gateway.keygen
+WorkingDirectory=/home/jared/marlin
