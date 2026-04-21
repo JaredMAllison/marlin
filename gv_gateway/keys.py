@@ -8,6 +8,12 @@ from pathlib import Path
 DICT_PATH = Path("/usr/share/dict/words")
 KEY_PATH = Path.home() / ".config" / "marlin" / "gv_gateway.key"
 
+ROUTE_DESCRIPTIONS = {
+    "inbox": "→ Jared's Exo-Brain: appends your message to the inbox",
+    "sos":   "→ Emergency broadcast: SMS to family + Nextcloud Talk alert",
+    "ntfy":  "→ Push notification directly to Jared's phone",
+}
+
 
 def _load_words(dict_path: Path = DICT_PATH) -> list[str]:
     with open(dict_path) as f:
@@ -33,13 +39,29 @@ def read_key(key_path: Path = KEY_PATH) -> str:
     return key_path.read_text().strip()
 
 
-def email_key(word: str, config) -> None:
+def _build_directory(word: str, routes: list[str]) -> str:
+    lines = []
+    for r in routes:
+        desc = ROUTE_DESCRIPTIONS.get(r, "→ (route description not configured)")
+        lines.append(f"  {word}: {r}: your message\n      {desc}")
+    return "\n\n".join(lines)
+
+
+def email_key(word: str, user, config) -> None:
     today = date.today().strftime("%Y-%m-%d")
+    directory = _build_directory(word, user.routes)
+    body = (
+        f"Marlin key for {today}: {word}\n\n"
+        f"Send a command by SMS to (971) 246-7642:\n\n"
+        f"{directory}\n\n"
+        f"Format: [key]: [command]: [your message]\n"
+        f"Example: {word}: {user.routes[0]}: your message here\n"
+    )
     msg = EmailMessage()
     msg["Subject"] = f"Marlin Key — {today}"
     msg["From"] = config.gmail_address
-    msg["To"] = config.personal_email
-    msg.set_content(word)
+    msg["To"] = user.email
+    msg.set_content(body)
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
         smtp.login(config.gmail_address, config.gmail_app_password)
         smtp.send_message(msg)

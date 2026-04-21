@@ -67,6 +67,77 @@ def update_frontmatter(path: Path, updates: dict) -> bool:
     path.write_text(f"---\n{new_fm}\n---{parts[2]}", encoding="utf-8")
     return True
 
+def read_frontmatter(path: Path) -> dict:
+    text = path.read_text(encoding="utf-8")
+    parts = text.split("---", 2)
+    if len(parts) < 3:
+        return {}
+    try:
+        return yaml.safe_load(parts[1]) or {}
+    except yaml.YAMLError:
+        return {}
+
+def next_occurrence(recurrence: str, from_date: date) -> date:
+    """Return the next occurrence date given a recurrence value."""
+    if recurrence == "daily":
+        return from_date + timedelta(days=1)
+    elif recurrence == "weekly":
+        return from_date + timedelta(weeks=1)
+    elif recurrence == "biweekly":
+        return from_date + timedelta(weeks=2)
+    elif recurrence.startswith("every-") and recurrence.replace("every-", "").replace("-", "").isdigit():
+        n = int(recurrence.split("-")[1])
+        return from_date + timedelta(days=n)
+    elif recurrence.startswith("every-"):
+        weekday_map = {"monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
+                       "friday": 4, "saturday": 5, "sunday": 6}
+        target = weekday_map.get(recurrence.removeprefix("every-"), 0)
+        days_ahead = (target - from_date.weekday()) % 7 or 7
+        return from_date + timedelta(days=days_ahead)
+    else:
+        return from_date + timedelta(days=1)
+
+ADL_LOG = VAULT.parent / "ADL-log.md"
+
+def append_adl_log(entry_date: str, slug: str, status: str):
+    """Append a done/missed row to ADL-log.md."""
+    row = f"| {entry_date} | {slug} | {status} |\n"
+    text = ADL_LOG.read_text(encoding="utf-8")
+    ADL_LOG.write_text(text + row, encoding="utf-8")
+
+def get_due_adls() -> list[dict]:
+    """Return recurring tasks with goal_date <= today, sorted by start_time."""
+    today = date.today()
+    adls = []
+    for path in VAULT.glob("*.md"):
+        text = path.read_text(encoding="utf-8")
+        parts = text.split("---", 2)
+        if len(parts) < 3:
+            continue
+        try:
+            fm = yaml.safe_load(parts[1])
+        except yaml.YAMLError:
+            continue
+        if not isinstance(fm, dict) or not fm.get("recurrence"):
+            continue
+        if "Self-Care" not in str(fm.get("project", "")):
+            continue
+        goal_date = fm.get("goal_date")
+        if goal_date is None:
+            continue
+        if isinstance(goal_date, str):
+            try:
+                goal_date = date.fromisoformat(goal_date)
+            except ValueError:
+                continue
+        if goal_date <= today:
+            adls.append({
+                "title": fm.get("title", path.stem),
+                "start_time": fm.get("start_time") or "",
+            })
+    adls.sort(key=lambda x: (x["start_time"] == "", str(x["start_time"])))
+    return adls
+
 # ── Ntfy ──────────────────────────────────────────────────────────────────────
 
 def send_mode_notification(mode: str):
@@ -98,12 +169,21 @@ def send_mode_notification(mode: str):
 
 # ── HTML UI ───────────────────────────────────────────────────────────────────
 
-def mode_page(current_mode: str) -> str:
+def mode_page(current_mode: str, adls: list[dict]) -> str:
     emoji, label, color = MODE_LABELS.get(current_mode, ("❓", current_mode, "#333"))
-    buttons = ""
+    mode_buttons = ""
     for m, (e, l, c) in MODE_LABELS.items():
         active = ' style="opacity:0.4;pointer-events:none;"' if m == current_mode else ""
-        buttons += f'<a href="/mode?set={m}"{active}><button style="background:{c}">{e} {l}</button></a>\n'
+        mode_buttons += f'<a href="/mode?set={m}"{active}><button style="background:{c}">{e} {l}</button></a>\n'
+    adl_section = ""
+    if adls:
+        adl_buttons = ""
+        for adl in adls:
+            encoded = quote(adl["title"])
+            adl_buttons += f'<a href="/done?task={encoded}"><button style="background:#1a4a2e">✓ {adl["title"]}</button></a>\n'
+        adl_section = f"""
+<h2 style="margin-top:2rem;font-size:0.9rem;color:#aaa;letter-spacing:0.08em;text-transform:uppercase;">Self-Care</h2>
+{adl_buttons}"""
     return f"""<!DOCTYPE html>
 <html>
 <head>
@@ -121,7 +201,7 @@ def mode_page(current_mode: str) -> str:
 <body>
 <h1>Marlin</h1>
 <div class="mode">{emoji} {label}</div>
-{buttons}
+{mode_buttons}{adl_section}
 </body>
 </html>"""
 
@@ -154,7 +234,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
         # ── Status page ──
         if action == "":
             state = load_state()
-            html = mode_page(state.get("mode", "available"))
+            html = mode_page(state.get("mode", "available"), get_due_adls())
             self.send_response(200)
             self.send_header("Content-Type", "text/html")
             self.end_headers()
@@ -175,8 +255,18 @@ class WebhookHandler(BaseHTTPRequestHandler):
         today = date.today().isoformat()
 
         if action == "done":
-            ok = update_frontmatter(path, {"status": "done", "completed": today})
-            msg = f"Done: {title}" if ok else "Update failed"
+            fm = read_frontmatter(path)
+            recurrence = fm.get("recurrence")
+            if recurrence:
+                # Recurring task — advance goal_date, keep status: queued
+                next_date = next_occurrence(recurrence, date.today())
+                ok = update_frontmatter(path, {"goal_date": next_date})
+                if ok:
+                    append_adl_log(today, path.stem, "done")
+                msg = f"Done (recurring → {next_date}): {title}" if ok else "Update failed"
+            else:
+                ok = update_frontmatter(path, {"status": "done", "completed": today})
+                msg = f"Done: {title}" if ok else "Update failed"
 
         elif action == "defer":
             defer_until = (date.today() + timedelta(days=1)).isoformat()
@@ -195,8 +285,13 @@ class WebhookHandler(BaseHTTPRequestHandler):
             self.respond(400, f"Unknown action: {action}")
             return
 
-        self.respond(200 if ok else 500, msg)
         print(msg)
+        if ok:
+            self.send_response(302)
+            self.send_header("Location", "/")
+            self.end_headers()
+        else:
+            self.respond(500, msg)
 
     def respond(self, code: int, message: str):
         self.send_response(code)
