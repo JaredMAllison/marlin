@@ -1,7 +1,7 @@
 import pytest
 import yaml
 from pathlib import Path
-from vault import read_frontmatter, update_frontmatter
+from vault import read_frontmatter, update_frontmatter, find_tasks, find_projects
 
 
 def test_read_frontmatter_returns_dict(tmp_path):
@@ -48,9 +48,6 @@ def test_update_frontmatter_no_frontmatter_returns_false(tmp_path):
     f = tmp_path / "plain.md"
     f.write_text("No frontmatter here")
     assert update_frontmatter(f, {"status": "done"}) is False
-
-
-from vault import find_tasks, find_projects
 
 
 def _make_task(tmp_path, name, **fields):
@@ -123,6 +120,7 @@ def test_find_projects_skips_companion_files(tmp_path):
     content = "---\n" + yaml.dump(fm, default_flow_style=False) + "---\n"
     (tmp_path / "real-project-roadmap.md").write_text(content)
     (tmp_path / "real-project-changelog.md").write_text(content)
+    (tmp_path / "real-project-open-questions.md").write_text(content)
     projects = find_projects(tmp_path)
     assert len(projects) == 1
     assert projects[0]["title"] == "Real Project"

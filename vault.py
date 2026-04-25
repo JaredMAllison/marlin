@@ -68,13 +68,13 @@ def find_projects(projects_path: Path, filters: dict | None = None) -> list[dict
       priority: int | list[int] — match priority field
       status: str — exact match on status field
     Skips roadmap and changelog files automatically.
-    Each result dict has '_slug' and '_path' set.
+    Each result dict has '_slug' and '_path' (Path object, not str) set.
     """
     filters = filters or {}
     results = []
     for path in sorted(projects_path.glob("*.md")):
         stem = path.stem
-        if stem.endswith("-roadmap") or stem.endswith("-changelog") or stem.endswith("-brief"):
+        if stem.endswith("-roadmap") or stem.endswith("-changelog") or stem.endswith("-brief") or stem.endswith("-open-questions"):
             continue
         fm = read_frontmatter(path)
         if fm.get("type") != "project":
