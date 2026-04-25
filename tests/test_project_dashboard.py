@@ -140,3 +140,35 @@ def test_get_project_detail_wrong_type_returns_none(tmp_path):
     (tmp_path / "notes.md").write_text("---\ntype: note\ntitle: Notes\n---\n")
     result = get_project_detail("notes", tmp_path, tmp_path)
     assert result is None
+
+
+def test_get_projects_summary_hides_complete_by_default(tmp_path):
+    from project_dashboard import get_projects_summary
+    projects_path = tmp_path / "Projects"
+    tasks_path = tmp_path / "Tasks"
+    projects_path.mkdir()
+    tasks_path.mkdir()
+
+    _write_project(projects_path, "active-project", status="active", priority=1)
+    _write_project(projects_path, "done-project", status="complete", priority=1)
+
+    results = get_projects_summary(projects_path, tasks_path)
+    titles = {r["title"] for r in results}
+    assert "Active Project" in titles
+    assert "Done Project" not in titles
+
+
+def test_get_projects_summary_show_done_includes_complete(tmp_path):
+    from project_dashboard import get_projects_summary
+    projects_path = tmp_path / "Projects"
+    tasks_path = tmp_path / "Tasks"
+    projects_path.mkdir()
+    tasks_path.mkdir()
+
+    _write_project(projects_path, "active-project", status="active", priority=1)
+    _write_project(projects_path, "done-project", status="complete", priority=1)
+
+    results = get_projects_summary(projects_path, tasks_path, hide_done=False)
+    titles = {r["title"] for r in results}
+    assert "Active Project" in titles
+    assert "Done Project" in titles

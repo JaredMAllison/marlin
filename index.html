@@ -819,8 +819,11 @@ function dayLabel(iso) {
 
 // ---- API with mock fallback -----------------------------------------
 
-async function apiList(includeP3) {
-  const url = "/api/projects" + (includeP3 ? "?priority=all" : "");
+async function apiList(includeP3, hideDone) {
+  const params = [];
+  if (includeP3) params.push("priority=all");
+  if (!hideDone) params.push("show_done=true");
+  const url = "/api/projects" + (params.length ? "?" + params.join("&") : "");
   try {
     const r = await fetch(url, { cache: "no-store" });
     if (!r.ok) throw new Error(r.status);
@@ -828,6 +831,7 @@ async function apiList(includeP3) {
   } catch (e) {
     let list = window.MOCK_PROJECTS.slice();
     if (!includeP3) list = list.filter(p => p.priority <= 2);
+    if (hideDone) list = list.filter(p => p.status !== "complete");
     return list;
   }
 }
@@ -863,6 +867,7 @@ const state = {
   slug: null,
   query: "",
   includeP3: false,
+  hideDone: true,
   projects: null,
   detailCache: {},
   lastFetched: null,
@@ -947,6 +952,21 @@ function viewList() {
     }, "All")
   );
   root.appendChild(toggle);
+
+  // Status toggle (active only / include done)
+  const statusToggle = el("div", {class:"toggle"},
+    el("button", {
+      type:"button",
+      "aria-pressed": state.hideDone.toString(),
+      onclick: () => { if (!state.hideDone) { state.hideDone = true; loadList(true); } }
+    }, "Active"),
+    el("button", {
+      type:"button",
+      "aria-pressed": (!state.hideDone).toString(),
+      onclick: () => { if (state.hideDone) { state.hideDone = false; loadList(true); } }
+    }, "Incl. done")
+  );
+  root.appendChild(statusToggle);
 
   // Card list (or skeleton/empty)
   const cardsWrap = el("div", {class:"cards", id:"cards"});
@@ -1206,7 +1226,7 @@ async function loadList(force) {
   if (force) state.projects = null;
   render();
   try {
-    state.projects = await apiList(state.includeP3);
+    state.projects = await apiList(state.includeP3, state.hideDone);
     state.lastFetched = new Date();
   } catch (e) {
     state.projects = [];
