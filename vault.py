@@ -1,4 +1,5 @@
 # vault.py
+import re
 from pathlib import Path
 
 import yaml
@@ -109,17 +110,18 @@ def resolve_roadmap_path(projects_path: Path, roadmap_link: str) -> Path | None:
 
     slug = (
         title.lower()
-        .replace(" — ", "-")   # em dash with spaces
-        .replace("—", "-")      # em dash without spaces
+        .replace(" — ", "-")
+        .replace("—", "-")
         .replace(" ", "-")
     )
+    slug = re.sub(r"[^a-z0-9-]", "", slug)
     candidate = projects_path / f"{slug}.md"
     if candidate.exists():
         return candidate
 
     for path in projects_path.glob("*.md"):
         fm = read_frontmatter(path)
-        if fm.get("title") == title:
+        if fm.get("title") == title and fm.get("type") == "project-roadmap":
             return path
 
     return None

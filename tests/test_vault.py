@@ -181,3 +181,9 @@ def test_resolve_roadmap_path_by_frontmatter_title(tmp_path):
 def test_resolve_roadmap_path_not_found(tmp_path):
     result = resolve_roadmap_path(tmp_path, "[[Nonexistent Roadmap]]")
     assert result is None
+
+
+def test_parse_roadmap_no_phases_returns_empty(tmp_path):
+    f = tmp_path / "roadmap.md"
+    f.write_text("---\ntitle: Roadmap\n---\nJust some prose, no phase headings.\n")
+    assert parse_roadmap(f) == []
