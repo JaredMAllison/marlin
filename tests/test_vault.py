@@ -266,3 +266,27 @@ def test_top_task_skips_non_queued():
 
 def test_top_task_empty_returns_none():
     assert top_task([]) is None
+
+
+def test_top_task_with_date_objects():
+    tasks = [
+        {"status": "queued", "title": "Later", "goal_date": date(2026, 5, 1), "duration": "short"},
+        {"status": "queued", "title": "Sooner", "goal_date": date(2026, 4, 25), "duration": "short"},
+    ]
+    assert top_task(tasks)["title"] == "Sooner"
+
+
+def test_top_task_duration_tiebreak():
+    tasks = [
+        {"status": "queued", "title": "Long", "goal_date": "2026-05-01", "duration": "long"},
+        {"status": "queued", "title": "Short", "goal_date": "2026-05-01", "duration": "short"},
+    ]
+    assert top_task(tasks)["title"] == "Short"
+
+
+def test_current_phase_skips_empty_items_phase():
+    phases = [
+        {"name": "Placeholder", "complete": False, "items": []},
+        {"name": "Active", "complete": False, "items": [{"text": "X", "done": False}]},
+    ]
+    assert current_phase(phases)["name"] == "Active"
