@@ -1,0 +1,1223 @@
+<!doctype html>
+<html lang="en" data-screen-label="Project Dashboard">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111111">
+<title>Marlin / projects</title>
+<style>
+  /* ---------- Tokens (mirrors webhook.py at :7832) ---------- */
+  :root {
+    --bg: #111;
+    --fg: #eee;
+    --muted: #aaa;
+    --dim: #666;
+
+    --card: rgba(255,255,255,0.04);
+    --card-2: rgba(255,255,255,0.07);
+    --line: rgba(255,255,255,0.08);
+    --line-2: rgba(255,255,255,0.14);
+
+    /* Priority accents — calm/focused palette */
+    --p1: rgba(40, 100, 160, 1);          /* P1 — focus blue */
+    --p1-soft: rgba(40, 100, 160, 0.18);
+    --p2: rgba(60, 110, 70, 1);           /* P2 — calm green */
+    --p2-soft: rgba(60, 110, 70, 0.22);
+    --p3: rgba(120, 100, 140, 1);         /* P3 — muted lavender */
+    --p3-soft: rgba(120, 100, 140, 0.20);
+    --good: rgba(45, 122, 45, 1);      /* active green */
+    --good-soft: rgba(45, 122, 45, 0.22);
+
+    --r-card: 14px;
+    --r-input: 10px;
+    --r-pill: 999px;
+
+    --w: 380px;
+    --pad: 2rem 1.25rem;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+
+  .app {
+    max-width: var(--w);
+    margin: 0 auto;
+    padding: var(--pad);
+  }
+
+  button { font: inherit; color: inherit; cursor: pointer; }
+  a { color: inherit; }
+
+  /* ---------- Page header ---------- */
+
+  .page-h {
+    display: flex; align-items: baseline; gap: 0.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .page-h h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+  .page-h .crumb {
+    font-size: 0.9rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 600;
+  }
+  .page-meta {
+    display: flex; gap: 0.75rem; align-items: center;
+    margin-bottom: 1.25rem;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .page-meta .dot { width: 4px; height: 4px; border-radius: 50%; background: var(--dim); }
+  .page-meta button.refresh {
+    margin-left: auto;
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: var(--r-input);
+    color: var(--muted);
+    padding: 6px 10px;
+    font-size: 14px;
+    line-height: 1;
+  }
+  .page-meta button.refresh:active { background: var(--card); }
+
+  .filter {
+    display: flex; gap: 8px; align-items: center;
+    margin-bottom: 1rem;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--r-input);
+    padding: 8px 12px;
+  }
+  .filter input {
+    flex: 1;
+    background: transparent;
+    border: 0;
+    outline: 0;
+    color: var(--fg);
+    font: inherit;
+    font-size: 15px;
+    padding: 4px 0;
+    min-width: 0;
+  }
+  .filter input::placeholder { color: var(--dim); }
+  .filter .sym { color: var(--muted); font-weight: 600; }
+
+  .toggle {
+    display: flex; gap: 6px;
+    margin-bottom: 1.25rem;
+  }
+  .toggle button {
+    flex: 1;
+    background: var(--card);
+    border: 1px solid var(--line);
+    color: var(--muted);
+    padding: 9px 8px;
+    border-radius: var(--r-input);
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .toggle button[aria-pressed="true"] {
+    background: var(--card-2);
+    color: var(--fg);
+    border-color: var(--line-2);
+  }
+
+  /* ---------- Card list ---------- */
+
+  .cards { display: flex; flex-direction: column; gap: 16px; }
+
+  .card {
+    --accent: rgba(255,255,255,0.4);
+    --accent-soft: rgba(255,255,255,0.06);
+    --accent-glow: rgba(255,255,255,0.0);
+    position: relative;
+    background:
+      linear-gradient(180deg, var(--accent-soft), transparent 40%),
+      var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--r-card);
+    padding: 16px 16px 16px 20px;
+    width: 100%;
+    text-align: left;
+    color: var(--fg);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.04) inset,
+      0 6px 14px -10px rgba(0,0,0,0.6);
+    transition: background 0.12s ease, border-color 0.12s ease, transform 0.12s ease;
+    overflow: hidden;
+  }
+  .card::before {
+    /* Thick priority side-bar */
+    content: "";
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: var(--accent);
+    box-shadow: 0 0 16px var(--accent-glow);
+  }
+  .card::after {
+    /* Subtle priority tint glow in the upper-left corner */
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(circle at 0% 0%, var(--accent-soft), transparent 55%);
+    opacity: 0.9;
+  }
+  .card > * { position: relative; z-index: 1; }
+  .card:active { transform: scale(0.995); border-color: var(--line-2); }
+
+  .card.p-1 {
+    --accent: var(--p1);
+    --accent-soft: rgba(40,100,160,0.16);
+    --accent-glow: rgba(40,100,160,0.35);
+    border-color: rgba(40,100,160,0.28);
+  }
+  .card.p-2 {
+    --accent: var(--p2);
+    --accent-soft: rgba(60,110,70,0.16);
+    --accent-glow: rgba(60,110,70,0.30);
+    border-color: rgba(60,110,70,0.28);
+  }
+  .card.p-3 {
+    --accent: var(--p3);
+    --accent-soft: rgba(120,100,140,0.14);
+    --accent-glow: rgba(120,100,140,0.28);
+    border-color: rgba(120,100,140,0.28);
+  }
+
+  /* Status-driven outline overrides */
+  .card.is-overdue { border-color: rgba(40,100,160,0.55); }
+  .card.is-near-done { border-color: rgba(45,122,45,0.45); }
+  .card.is-stalled { opacity: 0.78; }
+  .card.is-stalled::before { opacity: 0.45; }
+
+  .card-h {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .pri {
+    flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    height: 22px;
+    padding: 0 8px;
+    border-radius: var(--r-pill);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+  }
+  .pri-1 { background: rgba(40,100,160,0.28); color: #bcd6ee; box-shadow: inset 0 0 0 1px rgba(40,100,160,0.7); }
+  .pri-2 { background: rgba(60,110,70,0.32); color: #bfd9c4; box-shadow: inset 0 0 0 1px rgba(60,110,70,0.75); }
+  .pri-3 { background: rgba(120,100,140,0.30); color: #cbbfd9; box-shadow: inset 0 0 0 1px rgba(120,100,140,0.65); }
+
+  .card-title {
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.2;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .card-pct {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--fg);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+  .card-pct .unit {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    margin-left: 1px;
+  }
+  .card.p-1 .card-pct { color: #cfe1f2; }
+  .card.p-2 .card-pct { color: #bfd9c4; }
+  .card.p-3 .card-pct { color: #cbbfd9; }
+
+  .card-brief {
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.4;
+    text-wrap: pretty;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .bar {
+    position: relative;
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(0,0,0,0.35);
+    overflow: hidden;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
+  }
+  .bar-fill {
+    position: absolute; left: 0; top: 0; bottom: 0;
+    border-radius: 999px;
+    transition: width 0.3s ease;
+    box-shadow: 0 0 8px var(--accent-glow);
+  }
+  .pri-bar-1 { background: linear-gradient(90deg, rgba(40,100,160,0.7), rgba(80,150,210,1)); }
+  .pri-bar-2 { background: linear-gradient(90deg, rgba(60,110,70,0.7), rgba(110,180,130,1)); }
+  .pri-bar-3 { background: linear-gradient(90deg, rgba(120,100,140,0.7), rgba(160,140,180,1)); }
+
+  .card-meta {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6px;
+    font-size: 13px;
+  }
+  .card-meta .row {
+    display: flex; align-items: baseline; gap: 8px;
+    min-width: 0;
+  }
+  .eyebrow {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    flex-shrink: 0;
+    width: 56px;
+  }
+  .meta-val {
+    color: var(--fg);
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .meta-val.empty { color: var(--dim); font-style: italic; }
+  .phase-num {
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+    font-size: 12px;
+  }
+
+  .signals { display: flex; flex-wrap: wrap; gap: 6px; }
+  .sig {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 3px 7px;
+    border-radius: var(--r-pill);
+  }
+  .sig-overdue { background: var(--p1-soft); color: #a9c9e8; }
+  .sig-no-task { background: rgba(255,255,255,0.06); color: var(--muted); }
+  .sig-no-roadmap { background: rgba(255,255,255,0.06); color: var(--muted); }
+  .sig-stalled { background: var(--p3-soft); color: #cbbfd9; }
+  .sig-near-done { background: var(--good-soft); color: #b1d8b1; }
+
+  /* ---------- Detail view ---------- */
+
+  .back {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: transparent;
+    border: 0;
+    color: var(--muted);
+    font-size: 14px;
+    font-weight: 600;
+    padding: 0;
+    margin-bottom: 0.75rem;
+  }
+  .back:active { color: var(--fg); }
+
+  .detail-h {
+    margin-bottom: 1.25rem;
+  }
+  .detail-h .row1 { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .detail-h h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin: 0;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    text-wrap: pretty;
+  }
+  .detail-h .brief {
+    color: var(--muted);
+    font-size: 14px;
+    margin: 8px 0 14px;
+    text-wrap: pretty;
+  }
+
+  .detail-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 1.5rem;
+  }
+  .stat-tile {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--r-input);
+    padding: 12px;
+  }
+  .stat-tile .eyebrow { width: auto; margin-bottom: 4px; }
+  .stat-tile .val {
+    font-size: 22px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+  }
+  .stat-tile .sub {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .section {
+    margin-bottom: 1.75rem;
+  }
+  .section-h {
+    display: flex; align-items: baseline; justify-content: space-between;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin: 0 0 12px;
+  }
+  .section-h .count {
+    font-size: 12px;
+    color: var(--dim);
+    letter-spacing: 0.04em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Phases */
+  .phases { display: flex; flex-direction: column; gap: 10px; }
+  .phase {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--r-card);
+    padding: 12px 14px;
+  }
+  .phase.is-current {
+    border-color: rgba(60,110,70,0.55);
+    background: linear-gradient(var(--card), var(--card)) padding-box,
+                linear-gradient(180deg, var(--p2-soft), transparent) border-box;
+    box-shadow: inset 3px 0 0 var(--p2);
+  }
+  .phase.is-done .phase-name { color: var(--muted); }
+  .phase.is-done { opacity: 0.7; }
+  .phase-head {
+    display: flex; align-items: baseline; gap: 8px;
+    margin-bottom: 6px;
+  }
+  .phase-num-badge {
+    font-size: 10px;
+    color: var(--muted);
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+  }
+  .phase-name {
+    flex: 1;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--fg);
+    text-wrap: pretty;
+  }
+  .phase-meta {
+    color: var(--muted);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+  }
+  .phase-now {
+    font-size: 9.5px; font-weight: 700; letter-spacing: 0.1em;
+    color: #b6d2bd;
+    background: var(--p2-soft);
+    padding: 2px 6px;
+    border-radius: var(--r-pill);
+  }
+  .items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  .item {
+    display: flex; align-items: baseline; gap: 8px;
+    font-size: 14px;
+    padding: 2px 0;
+  }
+  .check {
+    flex-shrink: 0;
+    width: 16px; height: 16px;
+    border-radius: 4px;
+    border: 1.5px solid var(--line-2);
+    margin-top: 2px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 11px;
+    line-height: 1;
+  }
+  .item.done .check {
+    background: var(--good-soft);
+    border-color: var(--good);
+    color: #b1d8b1;
+  }
+  .item.done .check::before { content: "✓"; }
+  .item-text { flex: 1; text-wrap: pretty; }
+  .item.done .item-text { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--dim); }
+
+  /* Tasks */
+  .task-group { margin-bottom: 14px; }
+  .task-group-h {
+    font-size: 12px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin: 0 0 8px;
+    font-weight: 600;
+  }
+  .task {
+    display: flex; flex-direction: column; gap: 4px;
+    padding: 10px 12px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--r-input);
+    margin-bottom: 6px;
+  }
+  .task.overdue { border-color: rgba(40,100,160,0.4); background: rgba(40,100,160,0.06); }
+  .task.soon { border-color: rgba(60,110,70,0.4); }
+  .task-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--fg);
+    text-wrap: pretty;
+  }
+  .task.done .task-title {
+    color: var(--muted);
+    text-decoration: line-through;
+    text-decoration-color: var(--dim);
+    font-weight: 500;
+  }
+  .task-meta {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .task-meta .pill {
+    background: rgba(255,255,255,0.05);
+    padding: 1px 7px;
+    border-radius: var(--r-pill);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 700;
+  }
+  .task-meta .date.overdue { color: #a9c9e8; font-weight: 600; }
+  .task-meta .date.soon { color: #b6d2bd; font-weight: 600; }
+
+  details > summary.task-group-h {
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+  }
+  details > summary.task-group-h::-webkit-details-marker { display: none; }
+  details > summary.task-group-h::before { content: "▸ "; color: var(--dim); }
+  details[open] > summary.task-group-h::before { content: "▾ "; }
+
+  .empty-block {
+    color: var(--dim);
+    font-size: 13px;
+    font-style: italic;
+    padding: 12px 0;
+    text-align: center;
+  }
+
+  .err {
+    color: #a9c9e8;
+    background: var(--p1-soft);
+    border: 1px solid rgba(40,100,160,0.4);
+    border-radius: var(--r-input);
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+
+  /* Loading skeletons */
+  .skel {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--r-card);
+    height: 120px;
+    position: relative;
+    overflow: hidden;
+  }
+  .skel::after {
+    content: "";
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.04), transparent);
+    animation: shimmer 1.4s infinite;
+  }
+  @keyframes shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+
+  /* Wider screens — keep the column narrow but center it */
+  @media (min-width: 600px) {
+    :root { --w: 420px; }
+  }
+</style>
+</head>
+<body>
+<div id="root" class="app"></div>
+
+<!-- Mock data + buildMockDetail — falls back when /api/* isn't reachable.
+     In production (served by project_dashboard.py) the fetch hits the real API. -->
+<script>
+window.MOCK_PROJECTS = [
+  { slug:"job-hunt", title:"Job Hunt", priority:1, status:"active",
+    brief:"Senior IC role at a small product team — pipeline, prep, follow-ups.",
+    phase_current:"Phase 3 — Onsite Loop", phase_index:3, phase_total:5,
+    task_current:"Prep system-design reps for Friday onsite",
+    tasks_done:14, tasks_total:22, completion_pct:64 },
+  { slug:"id-replacement", title:"ID Replacement", priority:1, status:"active",
+    brief:"Replace lost driver's license + passport before May travel.",
+    phase_current:"Phase 2 — DMV Appointment", phase_index:2, phase_total:3,
+    task_current:"Bring proof-of-residence to DMV — Apr 28",
+    tasks_done:4, tasks_total:7, completion_pct:57 },
+  { slug:"interwest-inspection-preparation", title:"Interwest Inspection Prep", priority:1, status:"active",
+    brief:"Annual property inspection — repairs, tidy, documentation.",
+    phase_current:"Phase 1 — Repairs", phase_index:1, phase_total:4,
+    task_current:"Patch drywall in hallway",
+    tasks_done:2, tasks_total:11, completion_pct:18 },
+  { slug:"marlin", title:"Marlin", priority:2, status:"evergreen",
+    brief:"Context-aware task surfacing engine — flat-file vault, ntfy push, quickhacks.",
+    phase_current:"Phase 4 — Webhook Decomposition", phase_index:4, phase_total:7,
+    task_current:"Add find_tasks to vault.py",
+    tasks_done:18, tasks_total:31, completion_pct:58 },
+  { slug:"ariel-von-marlin", title:"Ariel von Marlin", priority:2, status:"active",
+    brief:"Always-on agent layer over Marlin vault — identity, runtime, orchestrator.",
+    phase_current:"Phase 2 — Runtime", phase_index:2, phase_total:6,
+    task_current:"Wire vault-sync to runtime worker",
+    tasks_done:9, tasks_total:27, completion_pct:33 },
+  { slug:"prosper0", title:"Prosper0", priority:2, status:"active",
+    brief:"Local LLM stack — bridge, deployment, transparency, vault, testing.",
+    phase_current:"Phase 3 — Bridge & Deployment", phase_index:3, phase_total:5,
+    task_current:"Bridge — websocket reconnect on stack restart",
+    tasks_done:22, tasks_total:38, completion_pct:58 },
+  { slug:"the-time-factory", title:"The Time Factory", priority:2, status:"active",
+    brief:"Time-tracking surface that piggybacks on Marlin — 1.0 release work.",
+    phase_current:"Phase 1 — Schema", phase_index:1, phase_total:4,
+    task_current:null, tasks_done:0, tasks_total:6, completion_pct:0 },
+  { slug:"adams-estate-inventory", title:"Adams Estate Inventory", priority:2, status:"active",
+    brief:"Catalog and value belongings; coordinate with executor.",
+    phase_current:"Phase 2 — Photographing", phase_index:2, phase_total:4,
+    task_current:"Photograph kitchen — overdue Apr 18",
+    tasks_done:6, tasks_total:19, completion_pct:32, _overdue:true },
+  { slug:"personal-sms-gateway", title:"Personal SMS Gateway", priority:2, status:"active",
+    brief:"Self-hosted SMS bridge for ntfy and Marlin push.",
+    phase_current:"Phase 4 — Hardening", phase_index:4, phase_total:4,
+    task_current:"Cert auto-renew via Caddy",
+    tasks_done:11, tasks_total:12, completion_pct:92 },
+  { slug:"dental-fix", title:"Dental Fix", priority:2, status:"active",
+    brief:"Crown replacement + cleaning sequence; insurance pre-auth.",
+    phase_current:"Phase 1 — Pre-auth", phase_index:1, phase_total:3,
+    task_current:null, tasks_done:1, tasks_total:5, completion_pct:20 },
+  { slug:"exobrain-context", title:"Exobrain Context Awareness", priority:2, status:"active",
+    brief:"Cross-vault context model for Ariel — focus state, mode signals.",
+    phase_current:"Phase 2 — Mode Detection", phase_index:2, phase_total:5,
+    task_current:"Map terminal-active to focus-mode",
+    tasks_done:4, tasks_total:14, completion_pct:29 },
+];
+
+window.MOCK_DETAIL = {
+  marlin: {
+    slug:"marlin", title:"Marlin", priority:2, status:"evergreen",
+    brief:"Context-aware task surfacing engine — flat-file vault, ntfy push, quickhacks.",
+    roadmap: [
+      { name:"Phase 1 — Core Engine", complete:true, items:[
+        {text:"Flat-file surfacing with status/goal_date/duration sort", done:true},
+        {text:"ntfy push notifications", done:true},
+        {text:"Webhook server on :7832", done:true},
+        {text:"Today/Inbox modes", done:true} ]},
+      { name:"Phase 2 — Vault Schema", complete:true, items:[
+        {text:"Project frontmatter conventions", done:true},
+        {text:"Task frontmatter conventions", done:true},
+        {text:"Roadmap file format", done:true} ]},
+      { name:"Phase 3 — Project Dashboard Backend", complete:true, items:[
+        {text:"Extract vault.py shared module", done:true},
+        {text:"project_dashboard.py on :7833", done:true},
+        {text:"/api/projects + /api/projects/:slug", done:true},
+        {text:"systemd unit", done:true},
+        {text:"dashboard frontmatter audit", done:true} ]},
+      { name:"Phase 4 — Webhook Decomposition", complete:false, items:[
+        {text:"Add find_tasks to vault.py", done:false},
+        {text:"Split surfacing module", done:false},
+        {text:"Split ADL module", done:false},
+        {text:"Split HTML rendering", done:false} ]},
+      { name:"Phase 5 — Quickhack Menu", complete:false, items:[
+        {text:"Termux SSH link", done:false},
+        {text:"/share endpoint", done:false},
+        {text:"Snooze presets", done:false} ]},
+      { name:"Phase 6 — Mode Awareness", complete:false, items:[
+        {text:"Read focus signal from Ariel", done:false},
+        {text:"Filter surface by mode", done:false} ]},
+      { name:"Phase 7 — Polish", complete:false, items:[
+        {text:"Audit log of surfaced tasks", done:false},
+        {text:"Failure-mode tests", done:false} ]},
+    ],
+    tasks: [
+      { title:"Add find_tasks to vault.py", status:"queued", goal_date:"2026-04-26", duration:"short", dashboard:true },
+      { title:"Split surfacing module", status:"queued", goal_date:"2026-04-28", duration:"long", dashboard:true },
+      { title:"Snooze preset: tomorrow morning", status:"queued", goal_date:"2026-04-30", duration:"short", dashboard:true },
+      { title:"/share endpoint — accept text + url", status:"queued", goal_date:"2026-05-04", duration:"medium", dashboard:true },
+      { title:"Filter surface by mode", status:"queued", goal_date:"", duration:"long", dashboard:true },
+      { title:"Audit log schema", status:"queued", goal_date:"", duration:"short", dashboard:true },
+      { title:"vault.py extracted", status:"done", goal_date:"2026-04-22", duration:"long", dashboard:true },
+      { title:"project_dashboard.py server", status:"done", goal_date:"2026-04-23", duration:"long", dashboard:true },
+      { title:"systemd unit installed", status:"done", goal_date:"2026-04-23", duration:"short", dashboard:true },
+      { title:"dashboard field audit", status:"done", goal_date:"2026-04-24", duration:"short", dashboard:true },
+    ],
+    tasks_done:18, tasks_total:31, completion_pct:58,
+  },
+  "job-hunt": {
+    slug:"job-hunt", title:"Job Hunt", priority:1, status:"active",
+    brief:"Senior IC role at a small product team — pipeline, prep, follow-ups.",
+    roadmap: [
+      { name:"Phase 1 — Pipeline", complete:true, items:[
+        {text:"List of 20 target companies", done:true},
+        {text:"Outreach template", done:true},
+        {text:"Tracking spreadsheet", done:true} ]},
+      { name:"Phase 2 — First-Round Loops", complete:true, items:[
+        {text:"Phone screens — top 8", done:true},
+        {text:"Tech screens — top 4", done:true} ]},
+      { name:"Phase 3 — Onsite Loop", complete:false, items:[
+        {text:"Prep system-design reps", done:false},
+        {text:"Behavioral story bank", done:true},
+        {text:"Onsite — Friday", done:false},
+        {text:"Onsite — following Tuesday", done:false} ]},
+      { name:"Phase 4 — Offer & Negotiation", complete:false, items:[
+        {text:"Comp benchmark research", done:false},
+        {text:"Counter-offer draft", done:false} ]},
+      { name:"Phase 5 — Wind-down", complete:false, items:[
+        {text:"Notify references", done:false},
+        {text:"Decline alternates gracefully", done:false} ]},
+    ],
+    tasks: [
+      { title:"Prep system-design reps for Friday onsite", status:"queued", goal_date:"2026-04-26", duration:"long", dashboard:true },
+      { title:"Refresh resume one-pager", status:"queued", goal_date:"2026-04-27", duration:"medium", dashboard:true },
+      { title:"Onsite — Friday", status:"queued", goal_date:"2026-04-30", duration:"long", dashboard:true },
+      { title:"Onsite — following Tuesday", status:"queued", goal_date:"2026-05-05", duration:"long", dashboard:true },
+      { title:"Comp benchmark spreadsheet", status:"queued", goal_date:"2026-05-07", duration:"medium", dashboard:true },
+    ],
+    tasks_done:14, tasks_total:22, completion_pct:64,
+  },
+};
+
+window.buildMockDetail = function(slug) {
+  if (window.MOCK_DETAIL[slug]) return window.MOCK_DETAIL[slug];
+  const summary = window.MOCK_PROJECTS.find(p => p.slug === slug);
+  if (!summary) return null;
+  const total = summary.phase_total || 4;
+  const idx = summary.phase_index || 1;
+  const roadmap = [];
+  for (let i = 1; i <= total; i++) {
+    const complete = i < idx;
+    const isCurrent = i === idx;
+    const items = [];
+    const itemCount = 2 + ((i + slug.length) % 3);
+    for (let j = 0; j < itemCount; j++) {
+      items.push({ text: `${summary.title} — phase ${i} item ${j+1}`,
+                   done: complete || (isCurrent && j === 0) });
+    }
+    roadmap.push({
+      name: isCurrent ? summary.phase_current : `Phase ${i}`,
+      complete, items
+    });
+  }
+  const tasks = [];
+  for (let i = 0; i < summary.tasks_total; i++) {
+    const done = i < summary.tasks_done;
+    tasks.push({
+      title: done ? `${summary.title} — completed task ${i+1}`
+        : (i === summary.tasks_done && summary.task_current ? summary.task_current
+           : `${summary.title} — pending task ${i+1}`),
+      status: done ? "done" : "queued",
+      goal_date: done ? "" : (i === summary.tasks_done ? "2026-04-28" : ""),
+      duration: ["short","medium","long"][i%3],
+      dashboard: true
+    });
+  }
+  return { ...summary, roadmap, tasks };
+};
+</script>
+
+<script>
+// =====================================================================
+// Marlin Project Dashboard — vanilla JS, no deps.
+// =====================================================================
+
+const TODAY = new Date();
+
+function $(html) {
+  const t = document.createElement("template");
+  t.innerHTML = html.trim();
+  return t.content.firstElementChild;
+}
+function el(tag, attrs = {}, ...children) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") n.className = v;
+    else if (k === "html") n.innerHTML = v;
+    else if (k.startsWith("on") && typeof v === "function") n.addEventListener(k.slice(2), v);
+    else if (v != null && v !== false) n.setAttribute(k, v);
+  }
+  for (const c of children.flat()) {
+    if (c == null || c === false) continue;
+    n.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+  }
+  return n;
+}
+
+// ---- Date helpers ----------------------------------------------------
+
+function daysUntil(iso) {
+  if (!iso) return null;
+  const d = new Date(iso + "T12:00:00");
+  if (isNaN(d.getTime())) return null;
+  return Math.round((d - TODAY) / 86400000);
+}
+function fmtDate(iso) {
+  if (!iso) return "";
+  const d = new Date(iso + "T12:00:00");
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("en-US", { month:"short", day:"numeric" });
+}
+function dayLabel(iso) {
+  const n = daysUntil(iso);
+  if (n === null) return "";
+  if (n < 0) return `${-n}d overdue`;
+  if (n === 0) return "today";
+  if (n === 1) return "tomorrow";
+  if (n < 7) return `in ${n}d`;
+  return fmtDate(iso);
+}
+
+// ---- API with mock fallback -----------------------------------------
+
+async function apiList(includeP3) {
+  const url = "/api/projects" + (includeP3 ? "?priority=all" : "");
+  try {
+    const r = await fetch(url, { cache: "no-store" });
+    if (!r.ok) throw new Error(r.status);
+    return await r.json();
+  } catch (e) {
+    let list = window.MOCK_PROJECTS.slice();
+    if (!includeP3) list = list.filter(p => p.priority <= 2);
+    return list;
+  }
+}
+async function apiDetail(slug) {
+  try {
+    const r = await fetch("/api/projects/" + encodeURIComponent(slug), { cache:"no-store" });
+    if (!r.ok) throw new Error(r.status);
+    return await r.json();
+  } catch (e) {
+    const d = window.buildMockDetail(slug);
+    if (!d) throw new Error("not found: " + slug);
+    return d;
+  }
+}
+
+// ---- Stale signals ---------------------------------------------------
+
+function signalsFor(p) {
+  const out = [];
+  if (p._overdue || (p.task_current || "").toLowerCase().includes("overdue"))
+    out.push({k:"overdue", l:"OVERDUE"});
+  if (!p.task_current) out.push({k:"no-task", l:"NO TASK"});
+  if (p.phase_total === 0) out.push({k:"no-roadmap", l:"NO ROADMAP"});
+  if (p.completion_pct === 0 && p.tasks_total > 0) out.push({k:"stalled", l:"STALLED"});
+  if (p.completion_pct >= 90) out.push({k:"near-done", l:"NEAR DONE"});
+  return out;
+}
+
+// ---- Router ----------------------------------------------------------
+
+const state = {
+  view: "list",       // "list" | "detail"
+  slug: null,
+  query: "",
+  includeP3: false,
+  projects: null,
+  detailCache: {},
+  lastFetched: null,
+};
+
+function readHash() {
+  const h = location.hash || "";
+  const m = h.match(/^#\/p\/([^/?#]+)/);
+  if (m) {
+    state.view = "detail";
+    state.slug = decodeURIComponent(m[1]);
+  } else {
+    state.view = "list";
+    state.slug = null;
+  }
+}
+function go(hash) {
+  if (location.hash !== hash) location.hash = hash;
+  else { readHash(); render(); }
+}
+
+window.addEventListener("hashchange", () => { readHash(); render(); });
+
+// ---- Views -----------------------------------------------------------
+
+function viewList() {
+  const root = el("div");
+
+  // Page header
+  root.appendChild(el("div", {class:"page-h"},
+    el("span", {class:"crumb"}, "marlin /"),
+    el("h1", {}, "projects")
+  ));
+
+  // Counts + refresh
+  const list = state.projects || [];
+  const visible = filteredList(list);
+  const counts = {
+    total: visible.length,
+    p1: visible.filter(p => p.priority === 1).length,
+    p2: visible.filter(p => p.priority === 2).length,
+    avg: visible.length ? Math.round(visible.reduce((s,p)=>s+(p.completion_pct||0),0) / visible.length) : 0,
+  };
+  const ts = state.lastFetched
+    ? state.lastFetched.toLocaleTimeString("en-US", {hour:"2-digit", minute:"2-digit", hour12:false})
+    : "—";
+
+  root.appendChild(el("div", {class:"page-meta"},
+    el("span", {}, `${counts.total} shown`),
+    el("span", {class:"dot"}),
+    el("span", {}, `${counts.p1}× P1 · ${counts.p2}× P2`),
+    el("span", {class:"dot"}),
+    el("span", {}, `${counts.avg}% avg`),
+    el("button", {class:"refresh", onclick: () => loadList(true)}, "↻ " + ts)
+  ));
+
+  // Filter input
+  const input = el("input", {
+    type:"text", placeholder:"filter projects", value: state.query,
+    spellcheck:"false", autocapitalize:"off", autocomplete:"off"
+  });
+  input.addEventListener("input", (e) => {
+    state.query = e.target.value;
+    rerenderCardsOnly(root);
+  });
+  root.appendChild(el("div", {class:"filter"},
+    el("span", {class:"sym"}, "/"),
+    input
+  ));
+
+  // P3 toggle
+  const toggle = el("div", {class:"toggle"},
+    el("button", {
+      type:"button",
+      "aria-pressed": (!state.includeP3).toString(),
+      onclick: () => { if (state.includeP3) { state.includeP3 = false; loadList(true); } }
+    }, "P1 + P2"),
+    el("button", {
+      type:"button",
+      "aria-pressed": state.includeP3.toString(),
+      onclick: () => { if (!state.includeP3) { state.includeP3 = true; loadList(true); } }
+    }, "All")
+  );
+  root.appendChild(toggle);
+
+  // Card list (or skeleton/empty)
+  const cardsWrap = el("div", {class:"cards", id:"cards"});
+  root.appendChild(cardsWrap);
+
+  if (state.projects === null) {
+    for (let i = 0; i < 4; i++) cardsWrap.appendChild(el("div", {class:"skel"}));
+  } else {
+    renderCards(cardsWrap, visible);
+  }
+
+  return root;
+}
+
+function filteredList(list) {
+  const q = state.query.trim().toLowerCase();
+  let out = list.slice();
+  if (q) {
+    out = out.filter(p =>
+      p.title.toLowerCase().includes(q) ||
+      (p.brief || "").toLowerCase().includes(q) ||
+      (p.task_current || "").toLowerCase().includes(q) ||
+      (p.phase_current || "").toLowerCase().includes(q)
+    );
+  }
+  out.sort((a, b) => (a.priority - b.priority) || a.title.localeCompare(b.title));
+  return out;
+}
+
+function rerenderCardsOnly(root) {
+  const wrap = root.querySelector("#cards");
+  if (!wrap || state.projects === null) return;
+  wrap.replaceChildren();
+  renderCards(wrap, filteredList(state.projects));
+}
+
+function renderCards(wrap, list) {
+  if (!list.length) {
+    wrap.appendChild(el("div", {class:"empty-block"}, "no projects match"));
+    return;
+  }
+  // group by priority for visual section breaks (subtle — just label runs)
+  let lastPri = null;
+  for (const p of list) {
+    if (p.priority !== lastPri) {
+      lastPri = p.priority;
+      wrap.appendChild(el("div", {class:"section-h", style:"margin-top:8px;margin-bottom:0;"},
+        el("span", {}, `P${p.priority}`),
+        el("span", {class:"count"}, `${list.filter(x=>x.priority===p.priority).length}`)
+      ));
+    }
+    wrap.appendChild(cardEl(p));
+  }
+}
+
+function cardEl(p) {
+  const sigs = signalsFor(p);
+  const sigKinds = new Set(sigs.map(s => s.k));
+  const classes = ["card", `p-${p.priority}`];
+  if (sigKinds.has("overdue")) classes.push("is-overdue");
+  if (sigKinds.has("near-done")) classes.push("is-near-done");
+  if (sigKinds.has("stalled")) classes.push("is-stalled");
+  const pct = el("span", {class:"card-pct"}, String(p.completion_pct ?? 0));
+  pct.appendChild(el("span", {class:"unit"}, "%"));
+  const card = el("button", {class: classes.join(" "), onclick: () => go("#/p/" + encodeURIComponent(p.slug))},
+    el("div", {class:"card-h"},
+      el("span", {class:`pri pri-${p.priority}`}, "P" + p.priority),
+      el("span", {class:"card-title"}, p.title),
+      pct
+    ),
+    p.brief ? el("div", {class:"card-brief"}, p.brief) : null,
+    el("div", {class:"bar"},
+      el("span", {class:`bar-fill pri-bar-${p.priority}`, style:`width:${p.completion_pct ?? 0}%`})
+    ),
+    el("div", {class:"card-meta"},
+      el("div", {class:"row"},
+        el("span", {class:"eyebrow"}, "Phase"),
+        p.phase_total > 0
+          ? [
+              el("span", {class:"meta-val"}, p.phase_current || "—"),
+              el("span", {class:"phase-num"}, `${p.phase_index || 0}/${p.phase_total}`)
+            ]
+          : el("span", {class:"meta-val empty"}, "no roadmap")
+      ),
+      el("div", {class:"row"},
+        el("span", {class:"eyebrow"}, "Now"),
+        p.task_current
+          ? el("span", {class:"meta-val"}, p.task_current)
+          : el("span", {class:"meta-val empty"}, "queue empty")
+      ),
+      el("div", {class:"row"},
+        el("span", {class:"eyebrow"}, "Tasks"),
+        el("span", {class:"meta-val"}, `${p.tasks_done}/${p.tasks_total} done`)
+      )
+    ),
+    sigs.length ? el("div", {class:"signals"},
+      sigs.map(s => el("span", {class:`sig sig-${s.k}`}, s.l))
+    ) : null
+  );
+  return card;
+}
+
+// ---- Detail view -----------------------------------------------------
+
+function viewDetail() {
+  const root = el("div");
+  root.appendChild(el("button", {class:"back", onclick: () => go("#/")},
+    el("span", {}, "←"),
+    el("span", {}, "all projects")
+  ));
+
+  const data = state.detailCache[state.slug];
+  if (data === undefined) {
+    // loading
+    root.appendChild(el("div", {class:"skel", style:"height:80px;margin-bottom:14px;"}));
+    root.appendChild(el("div", {class:"skel", style:"height:200px;"}));
+    apiDetail(state.slug)
+      .then(d => { state.detailCache[state.slug] = d; render(); })
+      .catch(err => { state.detailCache[state.slug] = { _err: String(err) }; render(); });
+    return root;
+  }
+  if (data && data._err) {
+    root.appendChild(el("div", {class:"err"}, data._err));
+    return root;
+  }
+
+  // Header
+  root.appendChild(el("div", {class:"detail-h"},
+    el("div", {class:"row1"},
+      el("span", {class:`pri pri-${data.priority}`}, "P" + data.priority),
+      el("span", {class:"phase-num-badge"}, (data.status || "").toUpperCase())
+    ),
+    el("h1", {}, data.title),
+    data.brief ? el("p", {class:"brief"}, data.brief) : null
+  ));
+
+  // Stat tiles
+  const phasesDone = data.roadmap.filter(p => p.complete).length;
+  const phaseTotal = data.roadmap.length;
+  const currentIdx = data.roadmap.findIndex(p => !p.complete && p.items.some(i => !i.done));
+  const currentPhase = currentIdx >= 0 ? data.roadmap[currentIdx] : null;
+
+  root.appendChild(el("div", {class:"detail-stats"},
+    el("div", {class:"stat-tile"},
+      el("div", {class:"eyebrow"}, "Completion"),
+      el("div", {class:"val"}, (data.completion_pct ?? 0) + "%"),
+      el("div", {class:"sub"}, `${data.tasks_done} of ${data.tasks_total} tasks`)
+    ),
+    el("div", {class:"stat-tile"},
+      el("div", {class:"eyebrow"}, "Phase"),
+      el("div", {class:"val"}, phaseTotal ? `${currentIdx >= 0 ? currentIdx + 1 : phaseTotal}/${phaseTotal}` : "—"),
+      el("div", {class:"sub"}, currentPhase ? currentPhase.name.replace(/^Phase\s+\d+\s+—\s*/, "") : (phaseTotal ? "complete" : "no roadmap"))
+    )
+  ));
+
+  // Roadmap section
+  const roadmapSection = el("section", {class:"section"},
+    el("h2", {class:"section-h"},
+      el("span", {}, "Roadmap"),
+      el("span", {class:"count"}, phaseTotal ? `${phasesDone}/${phaseTotal} phases` : "—")
+    )
+  );
+  if (!phaseTotal) {
+    roadmapSection.appendChild(el("div", {class:"empty-block"}, "no roadmap linked"));
+  } else {
+    const phasesEl = el("div", {class:"phases"});
+    data.roadmap.forEach((phase, i) => {
+      const done = phase.items.filter(x => x.done).length;
+      const isCurrent = i === currentIdx;
+      const phaseNode = el("div", {
+        class: "phase " + (phase.complete ? "is-done " : "") + (isCurrent ? "is-current" : "")
+      },
+        el("div", {class:"phase-head"},
+          el("span", {class:"phase-num-badge"}, String(i + 1).padStart(2,"0")),
+          el("span", {class:"phase-name"}, phase.name),
+          isCurrent ? el("span", {class:"phase-now"}, "NOW") : null,
+          el("span", {class:"phase-meta"}, phase.items.length ? `${done}/${phase.items.length}` : "—")
+        ),
+        el("ul", {class:"items"},
+          phase.items.map(it =>
+            el("li", {class: "item " + (it.done ? "done" : "")},
+              el("span", {class:"check"}),
+              el("span", {class:"item-text"}, it.text)
+            )
+          )
+        )
+      );
+      phasesEl.appendChild(phaseNode);
+    });
+    roadmapSection.appendChild(phasesEl);
+  }
+  root.appendChild(roadmapSection);
+
+  // Tasks section
+  const queued = data.tasks.filter(t => t.status !== "done");
+  const doneT = data.tasks.filter(t => t.status === "done");
+
+  const tasksSection = el("section", {class:"section"},
+    el("h2", {class:"section-h"},
+      el("span", {}, "Tasks"),
+      el("span", {class:"count"}, `${data.tasks_done}/${data.tasks_total}`)
+    )
+  );
+  // Sort queued by goal_date asc (missing last)
+  queued.sort((a, b) => {
+    const ad = a.goal_date || "9999-12-31";
+    const bd = b.goal_date || "9999-12-31";
+    return ad.localeCompare(bd);
+  });
+
+  const queuedGroup = el("div", {class:"task-group"},
+    el("h3", {class:"task-group-h"}, `queued · ${queued.length}`)
+  );
+  if (!queued.length) {
+    queuedGroup.appendChild(el("div", {class:"empty-block"}, "queue empty"));
+  } else {
+    queued.forEach(t => queuedGroup.appendChild(taskEl(t, false)));
+  }
+  tasksSection.appendChild(queuedGroup);
+
+  if (doneT.length) {
+    const detailsEl = el("details", {class:"task-group"},
+      el("summary", {class:"task-group-h"}, `done · ${doneT.length}`)
+    );
+    doneT.forEach(t => detailsEl.appendChild(taskEl(t, true)));
+    tasksSection.appendChild(detailsEl);
+  }
+  root.appendChild(tasksSection);
+
+  return root;
+}
+
+function taskEl(t, isDone) {
+  const n = daysUntil(t.goal_date);
+  const overdue = !isDone && n !== null && n < 0;
+  const soon = !isDone && n !== null && n >= 0 && n <= 3;
+  return el("div", {class: "task" + (isDone ? " done" : "") + (overdue ? " overdue" : (soon ? " soon" : ""))},
+    el("div", {class:"task-title"}, t.title),
+    el("div", {class:"task-meta"},
+      t.duration ? el("span", {class:"pill"}, t.duration) : null,
+      el("span", {class: "date" + (overdue ? " overdue" : (soon ? " soon" : ""))},
+        isDone ? (t.goal_date ? fmtDate(t.goal_date) : "") : (t.goal_date ? dayLabel(t.goal_date) : "no date"))
+    )
+  );
+}
+
+// ---- Render ----------------------------------------------------------
+
+function render() {
+  const root = document.getElementById("root");
+  root.replaceChildren();
+  root.appendChild(state.view === "detail" ? viewDetail() : viewList());
+  window.scrollTo({ top: 0, behavior: "instant" });
+}
+
+async function loadList(force) {
+  if (force) state.projects = null;
+  render();
+  try {
+    state.projects = await apiList(state.includeP3);
+    state.lastFetched = new Date();
+  } catch (e) {
+    state.projects = [];
+  }
+  render();
+}
+
+// ---- Boot ------------------------------------------------------------
+
+readHash();
+loadList(false);
+</script>
+</body>
+</html>

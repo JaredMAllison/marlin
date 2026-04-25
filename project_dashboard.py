@@ -107,17 +107,7 @@ def get_project_detail(slug: str, projects_path: Path, tasks_path: Path) -> dict
     return build_project_detail(path, tasks_path, projects_path)
 
 
-PLACEHOLDER_HTML = (
-    b"<!DOCTYPE html>\n"
-    b"<html>\n"
-    b'<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">\n'
-    b"<title>Marlin Projects</title></head>\n"
-    b'<body style="font-family:sans-serif;color:#eee;background:#111;padding:2rem">\n'
-    b"<h1>Marlin Projects</h1>\n"
-    b"<p>Frontend coming soon - replace this file with the Claude Design output.</p>\n"
-    b"</body>\n"
-    b"</html>"
-)
+INDEX_PATH = Path(__file__).parent / "index.html"
 
 
 class ProjectDashboardHandler(BaseHTTPRequestHandler):
@@ -127,11 +117,17 @@ class ProjectDashboardHandler(BaseHTTPRequestHandler):
         path = parsed.path.rstrip("/") or "/"
 
         if path == "/":
+            try:
+                body = INDEX_PATH.read_bytes()
+            except FileNotFoundError:
+                self._text(500, "index.html not found next to project_dashboard.py")
+                return
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(PLACEHOLDER_HTML)))
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
             self.end_headers()
-            self.wfile.write(PLACEHOLDER_HTML)
+            self.wfile.write(body)
             return
 
         if path == "/api/projects":
