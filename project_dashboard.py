@@ -135,13 +135,21 @@ class ProjectDashboardHandler(BaseHTTPRequestHandler):
 
         if path == "/api/projects":
             priority_all = "priority=all" in (parsed.query or "")
-            data = get_projects_summary(PROJECTS_PATH, TASKS_PATH, priority_all=priority_all)
+            try:
+                data = get_projects_summary(PROJECTS_PATH, TASKS_PATH, priority_all=priority_all)
+            except Exception as e:
+                self._text(500, f"Internal error: {e}")
+                return
             self._json(data)
             return
 
         if path.startswith("/api/projects/"):
             slug = path[len("/api/projects/"):]
-            detail = get_project_detail(slug, PROJECTS_PATH, TASKS_PATH)
+            try:
+                detail = get_project_detail(slug, PROJECTS_PATH, TASKS_PATH)
+            except Exception as e:
+                self._text(500, f"Internal error: {e}")
+                return
             if detail is None:
                 self._text(404, "Not found")
                 return
@@ -167,7 +175,10 @@ class ProjectDashboardHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def log_message(self, format, *args):
-        pass
+        msg = format % args
+        if any(c in msg for c in ("40", "50")):
+            import sys
+            print(f"[dashboard] {self.path} {msg}", file=sys.stderr)
 
 
 def main():
