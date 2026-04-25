@@ -1,5 +1,6 @@
 # project_dashboard.py
 import json
+import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
@@ -175,10 +176,9 @@ class ProjectDashboardHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def log_message(self, format, *args):
-        msg = format % args
-        if any(c in msg for c in ("40", "50")):
-            import sys
-            print(f"[dashboard] {self.path} {msg}", file=sys.stderr)
+        code = args[1] if len(args) > 1 else ""
+        if code.startswith("4") or code.startswith("5"):
+            print(f"[dashboard] {self.address_string()} {args}", file=sys.stderr)
 
 
 def main():
