@@ -1,7 +1,8 @@
 import pytest
 import yaml
+from datetime import date
 from pathlib import Path
-from vault import read_frontmatter, update_frontmatter, find_tasks, find_projects, resolve_roadmap_path, parse_roadmap
+from vault import read_frontmatter, update_frontmatter, find_tasks, find_projects, resolve_roadmap_path, parse_roadmap, compute_completion, current_phase, top_task
 
 
 def test_read_frontmatter_returns_dict(tmp_path):
@@ -187,3 +188,81 @@ def test_parse_roadmap_no_phases_returns_empty(tmp_path):
     f = tmp_path / "roadmap.md"
     f.write_text("---\ntitle: Roadmap\n---\nJust some prose, no phase headings.\n")
     assert parse_roadmap(f) == []
+
+
+def test_compute_completion_mixed(tmp_path):
+    tasks = [
+        {"status": "done", "title": "A"},
+        {"status": "done", "title": "B"},
+        {"status": "queued", "title": "C"},
+    ]
+    result = compute_completion(tasks)
+    assert result == {"done": 2, "total": 3, "pct": 67}
+
+
+def test_compute_completion_excludes_dashboard_false():
+    tasks = [
+        {"status": "done", "title": "A"},
+        {"status": "queued", "title": "B", "dashboard": False},
+    ]
+    result = compute_completion(tasks)
+    assert result == {"done": 1, "total": 1, "pct": 100}
+
+
+def test_compute_completion_empty():
+    assert compute_completion([]) == {"done": 0, "total": 0, "pct": 0}
+
+
+def test_compute_completion_all_done():
+    tasks = [{"status": "done"}, {"status": "done"}]
+    assert compute_completion(tasks)["pct"] == 100
+
+
+def test_current_phase_returns_first_incomplete():
+    phases = [
+        {"name": "Phase 1", "complete": True, "items": [{"text": "A", "done": True}]},
+        {"name": "Phase 2", "complete": False, "items": [{"text": "B", "done": False}]},
+        {"name": "Phase 3", "complete": False, "items": [{"text": "C", "done": False}]},
+    ]
+    result = current_phase(phases)
+    assert result["name"] == "Phase 2"
+
+
+def test_current_phase_all_complete_returns_none():
+    phases = [
+        {"name": "Phase 1", "complete": True, "items": [{"text": "A", "done": True}]},
+    ]
+    assert current_phase(phases) is None
+
+
+def test_current_phase_empty_returns_none():
+    assert current_phase([]) is None
+
+
+def test_top_task_returns_soonest_goal_date():
+    tasks = [
+        {"status": "queued", "title": "Later", "goal_date": "2026-05-01", "duration": "short"},
+        {"status": "queued", "title": "Sooner", "goal_date": "2026-04-25", "duration": "short"},
+    ]
+    result = top_task(tasks)
+    assert result["title"] == "Sooner"
+
+
+def test_top_task_no_goal_date_sorts_last():
+    tasks = [
+        {"status": "queued", "title": "No Date", "goal_date": None, "duration": "short"},
+        {"status": "queued", "title": "Has Date", "goal_date": "2026-05-01", "duration": "short"},
+    ]
+    assert top_task(tasks)["title"] == "Has Date"
+
+
+def test_top_task_skips_non_queued():
+    tasks = [
+        {"status": "done", "title": "Done"},
+        {"status": "queued", "title": "Active", "goal_date": None, "duration": "short"},
+    ]
+    assert top_task(tasks)["title"] == "Active"
+
+
+def test_top_task_empty_returns_none():
+    assert top_task([]) is None

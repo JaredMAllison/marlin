@@ -1,4 +1,5 @@
 # vault.py
+from datetime import date
 import re
 from pathlib import Path
 
@@ -158,3 +159,46 @@ def parse_roadmap(path: Path) -> list[dict]:
         phase["complete"] = bool(items) and all(i["done"] for i in items)
 
     return phases
+
+
+def compute_completion(tasks: list[dict]) -> dict:
+    """
+    Returns {done, total, pct}.
+    Excludes tasks where dashboard == False from the count.
+    """
+    visible = [t for t in tasks if t.get("dashboard") is not False]
+    total = len(visible)
+    done = sum(1 for t in visible if t.get("status") == "done")
+    pct = round(done / total * 100) if total else 0
+    return {"done": done, "total": total, "pct": pct}
+
+
+def current_phase(phases: list[dict]) -> dict | None:
+    """Returns the first phase that has any open (done=False) item."""
+    for phase in phases:
+        if any(not i["done"] for i in phase["items"]):
+            return phase
+    return None
+
+
+def top_task(tasks: list[dict]) -> dict | None:
+    """
+    Returns the highest-priority queued task.
+    Sort: goal_date ASC (missing goal_date sorts last), then duration ASC.
+    """
+    queued = [t for t in tasks if t.get("status") == "queued"]
+    if not queued:
+        return None
+
+    def _sort_key(fm: dict):
+        goal = fm.get("goal_date")
+        if goal and not isinstance(goal, date):
+            try:
+                goal = date.fromisoformat(str(goal))
+            except (ValueError, TypeError):
+                goal = None
+        duration = DURATION_MINUTES.get(fm.get("duration", "medium"), 45)
+        return (goal or date(9999, 1, 1), duration)
+
+    queued.sort(key=_sort_key)
+    return queued[0]
