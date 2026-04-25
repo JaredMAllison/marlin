@@ -2,7 +2,34 @@
 
 ## [Unreleased]
 
+### Added
+- `vault.py` — shared vault I/O module: `read_frontmatter`, `update_frontmatter`, `find_tasks`, `find_projects`, `resolve_roadmap_path`, `parse_roadmap`, `compute_completion`, `current_phase`, `top_task` (ADR-023)
+- `project_dashboard.py` — HTTP server on port 7833; `/api/projects` (P1/P2 project summaries) and `/api/projects/<slug>` (full project detail with roadmap phases and task list)
+- `index.html` — self-contained mobile-first project dashboard frontend; hash-routed list + detail views; matches `:7832` visual language; bookmarkable on Android home screen
+- `marlin-project-dashboard.service` — systemd user service; project dashboard auto-starts on login
+- `dashboard` field added to project schema — P1/P2 projects `true`, P3+ `false`; 36 project files updated
+- 41 tests: `tests/test_vault.py` (34) + `tests/test_project_dashboard.py` (7)
+
+### Changed
+- `webhook.py` — refactored to import `read_frontmatter` and `update_frontmatter` from `vault.py`; duplicate implementations removed
+
+---
+
+### Added (prior unreleased)
+- `webhook.py` — full dashboard page replacing the original mode-only UI
+  - Surfaced task card — live on every page load; applies same mode/context/business-hours/available_from filters as marlin.py; decoupled from 15-min Ntfy timer
+  - Today's task list grouped by project with dot-notation duration (•/••/•••)
+  - Mode buttons (all 5 modes, current dimmed)
+  - ADL buttons (Self-Care section)
+  - Inbox capture bar fixed to bottom with flash confirmation; captures tagged `· dashboard`
+- `webhook.py` — `get_today_tasks()` excludes Self-Care project (covered by ADL section)
+- `webhook.py` — `append_inbox()` accepts optional `source` parameter; dashboard passes `"dashboard"`
+- `gv-keygen.service` — `Restart=on-failure`, `RestartSec=60s`, 5-retry cap over 10 min; fixes silent miss when network not ready at session start (ADR-019)
+- `CLAUDE.md` — naming convention: underscores for Python files/packages, hyphens for systemd unit names
+
 ### Planned
+- Termux SSH link on dashboard
+- Done/defer/snooze action buttons on surfaced task card
 - Nextcloud shared key file distribution
 - `sos` route handler (Twilio outbound + Nextcloud Talk)
 - `ntfy` route handler (direct push to user's ntfy topic)
