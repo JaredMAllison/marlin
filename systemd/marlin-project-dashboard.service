@@ -4,8 +4,8 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 /home/jared/marlin/.worktrees/project-dashboard/project_dashboard.py
-WorkingDirectory=/home/jared/marlin/.worktrees/project-dashboard
+ExecStart=/usr/bin/python3 /home/jared/marlin/project_dashboard.py
+WorkingDirectory=/home/jared/marlin
 Restart=on-failure
 RestartSec=5
 
