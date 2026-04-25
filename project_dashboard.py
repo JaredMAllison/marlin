@@ -87,11 +87,13 @@ def build_project_detail(project_path: Path, tasks_path: Path, projects_path: Pa
 
 
 def get_projects_summary(
-    projects_path: Path, tasks_path: Path, priority_all: bool = False
+    projects_path: Path, tasks_path: Path, priority_all: bool = False, hide_done: bool = True
 ) -> list[dict]:
     filters: dict = {"dashboard": True}
     if not priority_all:
         filters["priority"] = [1, 2]
+    if hide_done:
+        filters["exclude_complete"] = True
     projects = find_projects(projects_path, filters)
     projects.sort(key=lambda fm: (fm.get("priority") or 99, fm.get("title", "")))
     return [build_project_summary(fm["_path"], tasks_path, projects_path) for fm in projects]
@@ -132,8 +134,13 @@ class ProjectDashboardHandler(BaseHTTPRequestHandler):
 
         if path == "/api/projects":
             priority_all = "priority=all" in (parsed.query or "")
+            show_done = "show_done=true" in (parsed.query or "")
             try:
-                data = get_projects_summary(PROJECTS_PATH, TASKS_PATH, priority_all=priority_all)
+                data = get_projects_summary(
+                    PROJECTS_PATH, TASKS_PATH,
+                    priority_all=priority_all,
+                    hide_done=not show_done,
+                )
             except Exception as e:
                 self._text(500, f"Internal error: {e}")
                 return
