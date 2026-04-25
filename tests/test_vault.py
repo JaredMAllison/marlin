@@ -290,3 +290,21 @@ def test_current_phase_skips_empty_items_phase():
         {"name": "Active", "complete": False, "items": [{"text": "X", "done": False}]},
     ]
     assert current_phase(phases)["name"] == "Active"
+
+
+def test_find_projects_excludes_complete(tmp_path):
+    _make_project(tmp_path, "Active Project", status="active")
+    _make_project(tmp_path, "Done Project", status="complete")
+    results = find_projects(tmp_path, {"exclude_complete": True})
+    titles = {r["title"] for r in results}
+    assert "Active Project" in titles
+    assert "Done Project" not in titles
+
+
+def test_find_projects_includes_complete_when_flag_false(tmp_path):
+    _make_project(tmp_path, "Active Project", status="active")
+    _make_project(tmp_path, "Done Project", status="complete")
+    results = find_projects(tmp_path, {"exclude_complete": False})
+    titles = {r["title"] for r in results}
+    assert "Active Project" in titles
+    assert "Done Project" in titles

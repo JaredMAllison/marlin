@@ -69,6 +69,7 @@ def find_projects(projects_path: Path, filters: dict | None = None) -> list[dict
       dashboard: bool — if True, only return projects where dashboard == True
       priority: int | list[int] — match priority field
       status: str — exact match on status field
+      exclude_complete: bool — if True, skip projects where status == "complete"
     Skips roadmap and changelog files automatically.
     Each result dict has '_slug' and '_path' (Path object, not str) set.
     """
@@ -92,6 +93,8 @@ def find_projects(projects_path: Path, filters: dict | None = None) -> list[dict
                 if fm.get("priority") != allowed:
                     continue
         if "status" in filters and fm.get("status") != filters["status"]:
+            continue
+        if filters.get("exclude_complete") and fm.get("status") == "complete":
             continue
         fm["_slug"] = stem
         fm["_path"] = path
