@@ -93,6 +93,10 @@ def test_project_detail_includes_roadmap_and_tasks(tmp_path):
     assert detail["roadmap"][0]["complete"] is True
     assert len(detail["tasks"]) == 1
     assert detail["tasks"][0]["title"] == "My Task"
+    assert detail["phase_current"] == "Phase 2"
+    assert detail["phase_index"] == 2
+    assert detail["phase_total"] == 2
+    assert detail["task_current"] == "My Task"
 
 
 def test_get_projects_summary_filters_priority(tmp_path):

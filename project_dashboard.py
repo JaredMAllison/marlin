@@ -68,6 +68,10 @@ def build_project_detail(project_path: Path, tasks_path: Path, projects_path: Pa
         if roadmap_path:
             phases = parse_roadmap(roadmap_path)
 
+    cp = current_phase(phases)
+    phase_index = next((i + 1 for i, p in enumerate(phases) if p is cp), None)
+    tt = top_task(tasks)
+
     task_list = []
     for t in sorted(tasks, key=lambda x: (str(x.get("goal_date") or "9999"), x.get("title", ""))):
         task_list.append({
@@ -84,6 +88,10 @@ def build_project_detail(project_path: Path, tasks_path: Path, projects_path: Pa
         "priority": fm.get("priority"),
         "status": fm.get("status", ""),
         "brief": fm.get("brief", ""),
+        "phase_current": cp["name"] if cp else None,
+        "phase_index": phase_index,
+        "phase_total": len(phases),
+        "task_current": tt.get("title") if tt else None,
         "roadmap": phases,
         "tasks": task_list,
         "tasks_done": completion["done"],
