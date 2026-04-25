@@ -1,5 +1,8 @@
 # project_dashboard.py
+import json
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
+from urllib.parse import urlparse
 
 from vault import (
     read_frontmatter,
@@ -101,3 +104,77 @@ def get_project_detail(slug: str, projects_path: Path, tasks_path: Path) -> dict
     if fm.get("type") != "project":
         return None
     return build_project_detail(path, tasks_path, projects_path)
+
+
+PLACEHOLDER_HTML = (
+    b"<!DOCTYPE html>\n"
+    b"<html>\n"
+    b'<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">\n'
+    b"<title>Marlin Projects</title></head>\n"
+    b'<body style="font-family:sans-serif;color:#eee;background:#111;padding:2rem">\n'
+    b"<h1>Marlin Projects</h1>\n"
+    b"<p>Frontend coming soon - replace this file with the Claude Design output.</p>\n"
+    b"</body>\n"
+    b"</html>"
+)
+
+
+class ProjectDashboardHandler(BaseHTTPRequestHandler):
+
+    def do_GET(self):
+        parsed = urlparse(self.path)
+        path = parsed.path.rstrip("/") or "/"
+
+        if path == "/":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(PLACEHOLDER_HTML)))
+            self.end_headers()
+            self.wfile.write(PLACEHOLDER_HTML)
+            return
+
+        if path == "/api/projects":
+            priority_all = "priority=all" in (parsed.query or "")
+            data = get_projects_summary(PROJECTS_PATH, TASKS_PATH, priority_all=priority_all)
+            self._json(data)
+            return
+
+        if path.startswith("/api/projects/"):
+            slug = path[len("/api/projects/"):]
+            detail = get_project_detail(slug, PROJECTS_PATH, TASKS_PATH)
+            if detail is None:
+                self._text(404, "Not found")
+                return
+            self._json(detail)
+            return
+
+        self._text(404, "Not found")
+
+    def _json(self, data):
+        body = json.dumps(data, default=str).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _text(self, code: int, message: str):
+        body = message.encode("utf-8")
+        self.send_response(code)
+        self.send_header("Content-Type", "text/plain")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, format, *args):
+        pass
+
+
+def main():
+    server = HTTPServer(("0.0.0.0", PORT), ProjectDashboardHandler)
+    print(f"Marlin project dashboard on http://0.0.0.0:{PORT}")
+    server.serve_forever()
+
+
+if __name__ == "__main__":
+    main()
