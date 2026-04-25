@@ -308,3 +308,11 @@ def test_find_projects_includes_complete_when_flag_false(tmp_path):
     titles = {r["title"] for r in results}
     assert "Active Project" in titles
     assert "Done Project" in titles
+
+
+def test_find_projects_excludes_complete_missing_status_passes_through(tmp_path):
+    fm = {"type": "project", "title": "No Status Project"}
+    content = "---\n" + yaml.dump(fm, default_flow_style=False) + "---\n"
+    (tmp_path / "no-status.md").write_text(content)
+    results = find_projects(tmp_path, {"exclude_complete": True})
+    assert len(results) == 1
