@@ -102,8 +102,6 @@ def test_find_tasks_excludes_dashboard_false(tmp_path):
 def test_find_projects_filters_by_dashboard(tmp_path):
     _make_project(tmp_path, "Shown", dashboard=True, priority=1)
     _make_project(tmp_path, "Hidden", priority=2)
-    # Also create a roadmap file that should be skipped
-    (tmp_path / "shown-roadmap.md").write_text("---\ntitle: roadmap\n---\n")
     projects = find_projects(tmp_path, {"dashboard": True})
     assert len(projects) == 1
     assert projects[0]["title"] == "Shown"
@@ -116,3 +114,15 @@ def test_find_projects_filters_by_priority(tmp_path):
     projects = find_projects(tmp_path, {"priority": [1, 2]})
     assert len(projects) == 2
     assert all(p["priority"] in (1, 2) for p in projects)
+
+
+def test_find_projects_skips_companion_files(tmp_path):
+    _make_project(tmp_path, "Real Project", priority=1)
+    # Companion files with -roadmap, -changelog, -brief stems — even if they have type: project — must be skipped
+    fm = {"type": "project", "title": "Should Not Appear", "status": "active", "priority": 1}
+    content = "---\n" + yaml.dump(fm, default_flow_style=False) + "---\n"
+    (tmp_path / "real-project-roadmap.md").write_text(content)
+    (tmp_path / "real-project-changelog.md").write_text(content)
+    projects = find_projects(tmp_path)
+    assert len(projects) == 1
+    assert projects[0]["title"] == "Real Project"
