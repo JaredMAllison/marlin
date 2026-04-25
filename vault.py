@@ -95,3 +95,64 @@ def find_projects(projects_path: Path, filters: dict | None = None) -> list[dict
         fm["_path"] = path
         results.append(fm)
     return results
+
+
+def resolve_roadmap_path(projects_path: Path, roadmap_link: str) -> Path | None:
+    """
+    roadmap_link is "[[Title]]" format.
+    Strategy 1: slugify the title and look for <slug>.md in projects_path.
+    Strategy 2: scan *-roadmap.md files for matching frontmatter title.
+    """
+    title = roadmap_link.strip()
+    if title.startswith("[[") and title.endswith("]]"):
+        title = title[2:-2]
+
+    slug = (
+        title.lower()
+        .replace(" — ", "-")   # em dash with spaces
+        .replace("—", "-")      # em dash without spaces
+        .replace(" ", "-")
+    )
+    candidate = projects_path / f"{slug}.md"
+    if candidate.exists():
+        return candidate
+
+    for path in projects_path.glob("*.md"):
+        fm = read_frontmatter(path)
+        if fm.get("title") == title:
+            return path
+
+    return None
+
+
+def parse_roadmap(path: Path) -> list[dict]:
+    """
+    Returns list of Phase dicts:
+      { name: str, complete: bool, items: list[{text: str, done: bool}] }
+    Parses ## headings as phase names, - [x] / - [ ] as items.
+    A phase is complete only if it has at least one item and all are done.
+    """
+    text = path.read_text(encoding="utf-8")
+    phases: list[dict] = []
+    current: dict | None = None
+
+    for line in text.splitlines():
+        if line.startswith("## "):
+            if current is not None:
+                phases.append(current)
+            current = {"name": line[3:].strip(), "items": []}
+        elif line.startswith("- [x] ") or line.startswith("- [X] "):
+            if current is not None:
+                current["items"].append({"text": line[6:].strip(), "done": True})
+        elif line.startswith("- [ ] "):
+            if current is not None:
+                current["items"].append({"text": line[6:].strip(), "done": False})
+
+    if current is not None:
+        phases.append(current)
+
+    for phase in phases:
+        items = phase["items"]
+        phase["complete"] = bool(items) and all(i["done"] for i in items)
+
+    return phases

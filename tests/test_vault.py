@@ -1,7 +1,7 @@
 import pytest
 import yaml
 from pathlib import Path
-from vault import read_frontmatter, update_frontmatter, find_tasks, find_projects
+from vault import read_frontmatter, update_frontmatter, find_tasks, find_projects, resolve_roadmap_path, parse_roadmap
 
 
 def test_read_frontmatter_returns_dict(tmp_path):
@@ -124,3 +124,60 @@ def test_find_projects_skips_companion_files(tmp_path):
     projects = find_projects(tmp_path)
     assert len(projects) == 1
     assert projects[0]["title"] == "Real Project"
+
+
+def test_parse_roadmap_phases_and_items(tmp_path):
+    f = tmp_path / "marlin-roadmap.md"
+    f.write_text(
+        "## Phase 1 — Done\n\n- [x] Item A\n- [x] Item B\n\n"
+        "## Phase 2 — Open\n\n- [x] Item C\n- [ ] Item D\n"
+    )
+    phases = parse_roadmap(f)
+    assert len(phases) == 2
+    assert phases[0]["name"] == "Phase 1 — Done"
+    assert phases[0]["complete"] is True
+    assert phases[0]["items"] == [
+        {"text": "Item A", "done": True},
+        {"text": "Item B", "done": True},
+    ]
+    assert phases[1]["name"] == "Phase 2 — Open"
+    assert phases[1]["complete"] is False
+    assert phases[1]["items"][1] == {"text": "Item D", "done": False}
+
+
+def test_parse_roadmap_empty_phase_not_complete(tmp_path):
+    f = tmp_path / "roadmap.md"
+    f.write_text("## Phase 1 — No Items\n\n## Phase 2\n\n- [ ] Something\n")
+    phases = parse_roadmap(f)
+    assert phases[0]["complete"] is False  # no items → not complete
+    assert phases[1]["complete"] is False
+
+
+def test_parse_roadmap_ignores_non_phase_lines(tmp_path):
+    f = tmp_path / "roadmap.md"
+    f.write_text(
+        "---\ntitle: Roadmap\n---\n\nSome intro text.\n\n"
+        "## Phase 1\n\n- [x] Done thing\n\nSome notes here.\n"
+    )
+    phases = parse_roadmap(f)
+    assert len(phases) == 1
+    assert phases[0]["items"] == [{"text": "Done thing", "done": True}]
+
+
+def test_resolve_roadmap_path_by_stem(tmp_path):
+    roadmap = tmp_path / "marlin-roadmap.md"
+    roadmap.write_text("---\ntitle: Marlin — Roadmap\ntype: project-roadmap\n---\n")
+    result = resolve_roadmap_path(tmp_path, "[[Marlin — Roadmap]]")
+    assert result == roadmap
+
+
+def test_resolve_roadmap_path_by_frontmatter_title(tmp_path):
+    roadmap = tmp_path / "custom-name.md"
+    roadmap.write_text("---\ntitle: Marlin — Roadmap\ntype: project-roadmap\n---\n")
+    result = resolve_roadmap_path(tmp_path, "[[Marlin — Roadmap]]")
+    assert result == roadmap
+
+
+def test_resolve_roadmap_path_not_found(tmp_path):
+    result = resolve_roadmap_path(tmp_path, "[[Nonexistent Roadmap]]")
+    assert result is None
