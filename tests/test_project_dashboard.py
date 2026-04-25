@@ -127,3 +127,16 @@ def test_get_projects_summary_priority_all(tmp_path):
 
     results = get_projects_summary(projects_path, tasks_path, priority_all=True)
     assert len(results) == 2
+
+
+def test_get_project_detail_missing_slug_returns_none(tmp_path):
+    from project_dashboard import get_project_detail
+    result = get_project_detail("nonexistent", tmp_path, tmp_path)
+    assert result is None
+
+
+def test_get_project_detail_wrong_type_returns_none(tmp_path):
+    from project_dashboard import get_project_detail
+    (tmp_path / "notes.md").write_text("---\ntype: note\ntitle: Notes\n---\n")
+    result = get_project_detail("notes", tmp_path, tmp_path)
+    assert result is None

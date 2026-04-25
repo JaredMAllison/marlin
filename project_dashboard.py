@@ -18,7 +18,8 @@ PROJECTS_PATH = VAULT / "Projects"
 PORT = 7833
 
 
-def build_project_summary(project_path: Path, tasks_path: Path, projects_path: Path) -> dict:
+def _build_project_core(project_path: Path, tasks_path: Path, projects_path: Path) -> dict:
+    """Shared data assembly used by both summary and detail views."""
     fm = read_frontmatter(project_path)
     slug = project_path.stem
     title = fm.get("title", slug)
@@ -38,6 +39,9 @@ def build_project_summary(project_path: Path, tasks_path: Path, projects_path: P
     tt = top_task(tasks)
 
     return {
+        "_fm": fm,
+        "_tasks": tasks,
+        "_phases": phases,
         "slug": slug,
         "title": title,
         "priority": fm.get("priority"),
@@ -53,27 +57,18 @@ def build_project_summary(project_path: Path, tasks_path: Path, projects_path: P
     }
 
 
+def build_project_summary(project_path: Path, tasks_path: Path, projects_path: Path) -> dict:
+    core = _build_project_core(project_path, tasks_path, projects_path)
+    return {k: v for k, v in core.items() if not k.startswith("_")}
+
+
 def build_project_detail(project_path: Path, tasks_path: Path, projects_path: Path) -> dict:
-    fm = read_frontmatter(project_path)
-    slug = project_path.stem
-    title = fm.get("title", slug)
-
-    tasks = find_tasks(tasks_path, {"project": title})
-    completion = compute_completion(tasks)
-
-    phases = []
-    roadmap_link = fm.get("roadmap", "")
-    if roadmap_link:
-        roadmap_path = resolve_roadmap_path(projects_path, str(roadmap_link))
-        if roadmap_path:
-            phases = parse_roadmap(roadmap_path)
-
-    cp = current_phase(phases)
-    phase_index = next((i + 1 for i, p in enumerate(phases) if p is cp), None)
-    tt = top_task(tasks)
-
+    core = _build_project_core(project_path, tasks_path, projects_path)
     task_list = []
-    for t in sorted(tasks, key=lambda x: (str(x.get("goal_date") or "9999"), x.get("title", ""))):
+    for t in sorted(
+        core["_tasks"],
+        key=lambda x: (str(x.get("goal_date") or "9999"), x.get("title", "")),
+    ):
         task_list.append({
             "title": t.get("title", ""),
             "status": t.get("status", ""),
@@ -81,23 +76,10 @@ def build_project_detail(project_path: Path, tasks_path: Path, projects_path: Pa
             "duration": t.get("duration", ""),
             "dashboard": t.get("dashboard", True),
         })
-
-    return {
-        "slug": slug,
-        "title": title,
-        "priority": fm.get("priority"),
-        "status": fm.get("status", ""),
-        "brief": fm.get("brief", ""),
-        "phase_current": cp["name"] if cp else None,
-        "phase_index": phase_index,
-        "phase_total": len(phases),
-        "task_current": tt.get("title") if tt else None,
-        "roadmap": phases,
-        "tasks": task_list,
-        "tasks_done": completion["done"],
-        "tasks_total": completion["total"],
-        "completion_pct": completion["pct"],
-    }
+    result = {k: v for k, v in core.items() if not k.startswith("_")}
+    result["roadmap"] = core["_phases"]
+    result["tasks"] = task_list
+    return result
 
 
 def get_projects_summary(
