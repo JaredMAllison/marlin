@@ -1,0 +1,13 @@
+[Unit]
+Description=Marlin Project Dashboard — read-only project visualization
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /home/jared/marlin/project_dashboard.py
+WorkingDirectory=/home/jared/marlin
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

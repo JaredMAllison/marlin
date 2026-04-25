@@ -13,7 +13,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, quote, urlparse
 
-import yaml
+from vault import read_frontmatter, update_frontmatter
 
 VAULT = Path("/home/jared/Documents/Obsidian/Marlin/Tasks")
 STATE_FILE = Path("/home/jared/marlin/state.json")
@@ -41,31 +41,10 @@ def save_state(state: dict):
 
 def find_task(title: str) -> Path | None:
     for path in VAULT.glob("*.md"):
-        text = path.read_text(encoding="utf-8")
-        parts = text.split("---", 2)
-        if len(parts) < 3:
-            continue
-        try:
-            fm = yaml.safe_load(parts[1])
-        except yaml.YAMLError:
-            continue
+        fm = read_frontmatter(path)
         if isinstance(fm, dict) and fm.get("title") == title:
             return path
     return None
-
-def update_frontmatter(path: Path, updates: dict) -> bool:
-    text = path.read_text(encoding="utf-8")
-    parts = text.split("---", 2)
-    if len(parts) < 3:
-        return False
-    try:
-        fm = yaml.safe_load(parts[1]) or {}
-    except yaml.YAMLError:
-        return False
-    fm.update(updates)
-    new_fm = yaml.dump(fm, default_flow_style=False, allow_unicode=True).strip()
-    path.write_text(f"---\n{new_fm}\n---{parts[2]}", encoding="utf-8")
-    return True
 
 # ── Ntfy ──────────────────────────────────────────────────────────────────────
 

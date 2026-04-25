@@ -14,6 +14,17 @@ It does not surface anything during deep work. It does not batch notifications. 
 
 ---
 
+## Interfaces
+
+| URL | Purpose |
+|---|---|
+| `http://10.0.0.8:7832` | Mode switcher + task surfacing UI — bookmark to Android home screen |
+| `http://10.0.0.8:7833` | Project dashboard — P1/P2 project status, roadmap phases, task lists |
+| `http://10.0.0.8:7833/api/projects` | Project summary JSON (P1/P2, `dashboard: true`) |
+| `http://10.0.0.8:7833/api/projects/<slug>` | Full project detail JSON (roadmap + tasks) |
+
+---
+
 ## Modes
 
 Switch modes from the Marlin web UI at `http://10.0.0.8:7832` (bookmark it to your home screen).
@@ -138,7 +149,10 @@ A task will re-surface after 2 hours if ignored. Tapping Snooze also holds it fo
 | File | Purpose |
 |---|---|
 | `marlin.py` | Surfacing engine — run by systemd timer |
-| `webhook.py` | Action server — handles Done/Defer/Snooze/mode |
+| `webhook.py` | Action server — handles Done/Defer/Snooze/mode; serves UI at `:7832` |
+| `vault.py` | Shared vault I/O — all frontmatter read/write, task/project discovery, roadmap parsing |
+| `project_dashboard.py` | Project dashboard API server — serves JSON at `:7833`; reads vault via `vault.py` |
+| `index.html` | Project dashboard frontend — hash-routed SPA served at `http://10.0.0.8:7833/` |
 | `set-mode.sh` | CLI mode switcher (alternative to web UI) |
 | `state.json` | Runtime state — mode, snooze tracking (not in git) |
 
@@ -158,3 +172,9 @@ A task will re-surface after 2 hours if ignored. Tapping Snooze also holds it fo
 **Wrong task surfaced:**
 - Check frontmatter on the task file — status, available_from, context
 - Run marlin.py manually to see what it picks and why
+
+**Project dashboard blank or not loading:**
+- Check service: `systemctl --user status marlin-project-dashboard.service`
+- Check logs: `journalctl --user -u marlin-project-dashboard.service -n 20`
+- Verify `index.html` is in `~/marlin/` next to `project_dashboard.py`
+- Hit the API directly to isolate frontend vs backend: `curl http://localhost:7833/api/projects`
