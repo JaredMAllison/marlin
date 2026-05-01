@@ -196,8 +196,8 @@ def main():
     state = load_state()
     mode = state.get("mode", "available")
 
-    if mode == "deep-work":
-        print("Deep work — surfacing nothing.")
+    if mode in ("deep-work", "relaxing", "sleeping"):
+        print(f"{mode} — surfacing nothing.")
         sys.exit(0)
 
     # Check snooze
