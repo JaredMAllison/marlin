@@ -12,6 +12,11 @@
 
 ### Changed
 - `webhook.py` — refactored to import `read_frontmatter` and `update_frontmatter` from `vault.py`; duplicate implementations removed
+- `webhook.py` — renamed UI from "Marlin" to **Quickhacks** (Cyberpunk 2077 reference); reflects expanded scope beyond mode switching
+- `webhook.py` — `done` action now handles recurring tasks: advances `goal_date` via `next_occurrence()` instead of marking `status: done`; non-recurring tasks unchanged
+- `webhook.py` — task actions now redirect to `/` on success (302) instead of returning plain text; better phone UX
+- `webhook.py` — Self-Care section added to Quickhacks UI: surfaces due ADL tasks as tappable done buttons; powered by `get_due_adls()`
+- `webhook.py` — `next_occurrence()`, `get_due_adls()`, `append_adl_log()` added for recurring task and ADL support
 
 ---
 

@@ -17,6 +17,7 @@ from vault import read_frontmatter, update_frontmatter
 
 VAULT = Path("/home/jared/Documents/Obsidian/Marlin/Tasks")
 STATE_FILE = Path("/home/jared/marlin/state.json")
+ADL_LOG = VAULT.parent / "ADL-log.md"
 PORT = 7832
 NTFY_TOPIC = os.environ.get("MARLIN_NTFY_TOPIC", "")
 WEBHOOK_BASE = os.environ.get("MARLIN_WEBHOOK_BASE", "http://10.0.0.8:7832")
@@ -45,6 +46,58 @@ def find_task(title: str) -> Path | None:
         if isinstance(fm, dict) and fm.get("title") == title:
             return path
     return None
+
+def next_occurrence(recurrence: str, from_date: date) -> date:
+    if recurrence == "daily":
+        return from_date + timedelta(days=1)
+    elif recurrence == "weekly":
+        return from_date + timedelta(weeks=1)
+    elif recurrence == "biweekly":
+        return from_date + timedelta(weeks=2)
+    elif recurrence.startswith("every-") and recurrence.replace("every-", "").replace("-", "").isdigit():
+        n = int(recurrence.split("-")[1])
+        return from_date + timedelta(days=n)
+    elif recurrence.startswith("every-"):
+        weekday_map = {"monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
+                       "friday": 4, "saturday": 5, "sunday": 6}
+        target = weekday_map.get(recurrence.removeprefix("every-"), 0)
+        days_ahead = (target - from_date.weekday()) % 7 or 7
+        return from_date + timedelta(days=days_ahead)
+    else:
+        return from_date + timedelta(days=1)
+
+def append_adl_log(entry_date: str, slug: str, status: str):
+    row = f"| {entry_date} | {slug} | {status} |\n"
+    if ADL_LOG.exists():
+        text = ADL_LOG.read_text(encoding="utf-8")
+    else:
+        text = "| Date | Task | Status |\n|---|---|---|\n"
+    ADL_LOG.write_text(text + row, encoding="utf-8")
+
+def get_due_adls() -> list[dict]:
+    today = date.today()
+    adls = []
+    for path in VAULT.glob("*.md"):
+        fm = read_frontmatter(path)
+        if not isinstance(fm, dict) or not fm.get("recurrence"):
+            continue
+        if "Self-Care" not in str(fm.get("project", "")):
+            continue
+        goal_date = fm.get("goal_date")
+        if goal_date is None:
+            continue
+        if isinstance(goal_date, str):
+            try:
+                goal_date = date.fromisoformat(goal_date)
+            except ValueError:
+                continue
+        if goal_date <= today:
+            adls.append({
+                "title": fm.get("title", path.stem),
+                "start_time": fm.get("start_time") or "",
+            })
+    adls.sort(key=lambda x: (x["start_time"] == "", str(x["start_time"])))
+    return adls
 
 # ── Ntfy ──────────────────────────────────────────────────────────────────────
 
@@ -77,17 +130,26 @@ def send_mode_notification(mode: str):
 
 # ── HTML UI ───────────────────────────────────────────────────────────────────
 
-def mode_page(current_mode: str) -> str:
+def mode_page(current_mode: str, adls: list[dict] | None = None) -> str:
     emoji, label, color = MODE_LABELS.get(current_mode, ("❓", current_mode, "#333"))
-    buttons = ""
+    mode_buttons = ""
     for m, (e, l, c) in MODE_LABELS.items():
         active = ' style="opacity:0.4;pointer-events:none;"' if m == current_mode else ""
-        buttons += f'<a href="/mode?set={m}"{active}><button style="background:{c}">{e} {l}</button></a>\n'
+        mode_buttons += f'<a href="/mode?set={m}"{active}><button style="background:{c}">{e} {l}</button></a>\n'
+    adl_section = ""
+    if adls:
+        adl_buttons = ""
+        for adl in adls:
+            encoded = quote(adl["title"])
+            adl_buttons += f'<a href="/done?task={encoded}"><button style="background:#1a4a2e">✓ {adl["title"]}</button></a>\n'
+        adl_section = f"""
+<h2 style="margin-top:2rem;font-size:0.9rem;color:#aaa;letter-spacing:0.08em;text-transform:uppercase;">Self-Care</h2>
+{adl_buttons}"""
     return f"""<!DOCTYPE html>
 <html>
 <head>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Marlin</title>
+<title>Quickhacks</title>
 <style>
   body {{ font-family: sans-serif; text-align: center; padding: 2rem; background: #111; color: #eee; }}
   h1 {{ font-size: 2rem; margin-bottom: 0.25rem; }}
@@ -98,9 +160,9 @@ def mode_page(current_mode: str) -> str:
 </style>
 </head>
 <body>
-<h1>Marlin</h1>
+<h1>Quickhacks</h1>
 <div class="mode">{emoji} {label}</div>
-{buttons}
+{mode_buttons}{adl_section}
 </body>
 </html>"""
 
@@ -133,7 +195,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
         # ── Status page ──
         if action == "":
             state = load_state()
-            html = mode_page(state.get("mode", "available"))
+            html = mode_page(state.get("mode", "available"), get_due_adls())
             self.send_response(200)
             self.send_header("Content-Type", "text/html")
             self.end_headers()
@@ -154,8 +216,17 @@ class WebhookHandler(BaseHTTPRequestHandler):
         today = date.today().isoformat()
 
         if action == "done":
-            ok = update_frontmatter(path, {"status": "done", "completed": today})
-            msg = f"Done: {title}" if ok else "Update failed"
+            fm = read_frontmatter(path)
+            recurrence = fm.get("recurrence")
+            if recurrence:
+                next_date = next_occurrence(recurrence, date.today())
+                ok = update_frontmatter(path, {"goal_date": next_date})
+                if ok:
+                    append_adl_log(today, path.stem, "done")
+                msg = f"Done (recurring → {next_date}): {title}" if ok else "Update failed"
+            else:
+                ok = update_frontmatter(path, {"status": "done", "completed": today})
+                msg = f"Done: {title}" if ok else "Update failed"
 
         elif action == "defer":
             defer_until = (date.today() + timedelta(days=1)).isoformat()
@@ -174,8 +245,13 @@ class WebhookHandler(BaseHTTPRequestHandler):
             self.respond(400, f"Unknown action: {action}")
             return
 
-        self.respond(200 if ok else 500, msg)
         print(msg)
+        if ok:
+            self.send_response(302)
+            self.send_header("Location", "/")
+            self.end_headers()
+        else:
+            self.respond(500, msg)
 
     def respond(self, code: int, message: str):
         self.send_response(code)

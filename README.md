@@ -18,7 +18,7 @@ It does not surface anything during deep work. It does not batch notifications. 
 
 | URL | Purpose |
 |---|---|
-| `http://10.0.0.8:7832` | Mode switcher + task surfacing UI — bookmark to Android home screen |
+| `http://10.0.0.8:7832` | **Quickhack Panel** — mode switching, ADL completion, task done/defer/snooze, inbox capture. Bookmark to Android home screen. |
 | `http://10.0.0.8:7833` | Project dashboard — P1/P2 project status, roadmap phases, task lists |
 | `http://10.0.0.8:7833/api/projects` | Project summary JSON (P1/P2, `dashboard: true`) |
 | `http://10.0.0.8:7833/api/projects/<slug>` | Full project detail JSON (roadmap + tasks) |
@@ -27,7 +27,7 @@ It does not surface anything during deep work. It does not batch notifications. 
 
 ## Modes
 
-Switch modes from the Marlin web UI at `http://10.0.0.8:7832` (bookmark it to your home screen).
+Switch modes from the **Quickhack Panel** at `http://10.0.0.8:7832` (bookmark it to your home screen).
 
 | Mode | Behavior |
 |---|---|
