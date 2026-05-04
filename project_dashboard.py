@@ -4,7 +4,7 @@ import os
 import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 
 from vault import (
     read_frontmatter,
@@ -118,8 +118,14 @@ def build_vault_tree(vault_root: Path) -> list[dict]:
     for entry in sorted(vault_root.iterdir()):
         if entry.name.startswith(".") or entry.name.startswith("_"):
             continue
+        if entry.is_symlink():
+            continue
         if entry.is_dir():
-            for child in sorted(entry.iterdir()):
+            try:
+                children = sorted(entry.iterdir())
+            except (PermissionError, OSError):
+                continue
+            for child in children:
                 if child.name.startswith(".") or child.name.startswith("_"):
                     continue
                 results.append({
@@ -207,7 +213,6 @@ class ProjectDashboardHandler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/vault/file":
-            from urllib.parse import parse_qs
             rel = parse_qs(parsed.query).get("path", [None])[0]
             if not rel:
                 self._text(400, "Missing path parameter")
