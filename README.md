@@ -19,9 +19,13 @@ It does not surface anything during deep work. It does not batch notifications. 
 | URL | Purpose |
 |---|---|
 | `http://10.0.0.8:7832` | **Quickhack Panel** — mode switching, ADL completion, task done/defer/snooze, inbox capture. Bookmark to Android home screen. |
-| `http://10.0.0.8:7833` | Project dashboard — P1/P2 project status, roadmap phases, task lists |
+| `http://10.0.0.8:7832/api/state` | Current mode/state JSON |
+| `http://10.0.0.8:7832/api/adls` | Due ADL tasks JSON |
 | `http://10.0.0.8:7833/api/projects` | Project summary JSON (P1/P2, `dashboard: true`) |
 | `http://10.0.0.8:7833/api/projects/<slug>` | Full project detail JSON (roadmap + tasks) |
+| `http://10.0.0.8:7833/api/vault/tree` | Vault folder/file tree JSON |
+| `http://10.0.0.8:7833/api/vault/file?path=...` | Raw vault file content (text/plain) |
+| `http://10.0.0.8:9100` | **Cognitive Prosthetic Cockpit** — unified HUD; OoT-style chrome; Quest/Map/Items sub-screens |
 
 ---
 
@@ -149,12 +153,26 @@ A task will re-surface after 2 hours if ignored. Tapping Snooze also holds it fo
 | File | Purpose |
 |---|---|
 | `marlin.py` | Surfacing engine — run by systemd timer |
-| `webhook.py` | Action server — handles Done/Defer/Snooze/mode; serves UI at `:7832` |
+| `webhook.py` | Action server — handles Done/Defer/Snooze/mode + `/api/state` + `/api/adls`; serves Quickhacks UI at `:7832` |
 | `vault.py` | Shared vault I/O — all frontmatter read/write, task/project discovery, roadmap parsing |
-| `project_dashboard.py` | Project dashboard API server — serves JSON at `:7833`; reads vault via `vault.py` |
-| `index.html` | Project dashboard frontend — hash-routed SPA served at `http://10.0.0.8:7833/` |
+| `project_dashboard.py` | Project/vault API server at `:7833` — projects, vault tree, vault file content; reads vault via `vault.py` |
+| `setup_jason_instance.sh` | Multi-user deployment — idempotent; creates Linux user, seeds vault, installs services, copies cockpit |
+| `seed_vault.sh` | Seeds a fresh vault skeleton for a new LMF user |
 | `set-mode.sh` | CLI mode switcher (alternative to web UI) |
 | `state.json` | Runtime state — mode, snooze tracking (not in git) |
+
+### Environment variables
+
+All services read config from `.env` (loaded via `EnvironmentFile=` in systemd units) or directly from the environment.
+
+| Variable | Default | Used by |
+|---|---|---|
+| `MARLIN_VAULT_PATH` | `~/Documents/Obsidian/Marlin/Tasks` | webhook.py (Tasks dir) |
+| `MARLIN_VAULT_ROOT` | `~/Documents/Obsidian/Marlin` | project_dashboard.py (full vault) |
+| `MARLIN_WEBHOOK_PORT` | `7832` | webhook.py |
+| `MARLIN_DASHBOARD_PORT` | `7833` | project_dashboard.py |
+| `MARLIN_NTFY_TOPIC` | — | marlin.py, webhook.py |
+| `MARLIN_WEBHOOK_BASE` | `http://10.0.0.8:7832` | marlin.py (Ntfy action URLs) |
 
 ---
 

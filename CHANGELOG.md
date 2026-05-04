@@ -4,11 +4,13 @@
 
 ### Added
 - `vault.py` — shared vault I/O module: `read_frontmatter`, `update_frontmatter`, `find_tasks`, `find_projects`, `resolve_roadmap_path`, `parse_roadmap`, `compute_completion`, `current_phase`, `top_task` (ADR-023)
-- `project_dashboard.py` — HTTP server on port 7833; `/api/projects` (P1/P2 project summaries) and `/api/projects/<slug>` (full project detail with roadmap phases and task list)
-- `index.html` — self-contained mobile-first project dashboard frontend; hash-routed list + detail views; matches `:7832` visual language; bookmarkable on Android home screen
+- `project_dashboard.py` — HTTP server on port 7833; `/api/projects`, `/api/projects/<slug>`, `/api/vault/tree`, `/api/vault/file` endpoints; CORS on all responses; `MARLIN_VAULT_ROOT` env var (falls back to `MARLIN_VAULT_PATH`, then hardcoded default) (ADR-026)
 - `marlin-project-dashboard.service` — systemd user service; project dashboard auto-starts on login
 - `dashboard` field added to project schema — P1/P2 projects `true`, P3+ `false`; 36 project files updated
-- 41 tests: `tests/test_vault.py` (34) + `tests/test_project_dashboard.py` (7)
+- `setup_jason_instance.sh` — idempotent multi-user deployment script; creates Linux user, enables linger, seeds vault, writes `.env`, installs three systemd services (webhook :7842, project_dashboard :7843, cockpit :9101), copies cockpit repo, writes instance-specific `api.js`
+- `seed_vault.sh` — seeds a fresh vault skeleton with the required folder structure and sentinel files for Ariel onboarding
+- `webhook.py` — `/api/state` GET endpoint returns current mode/state JSON; `/api/adls` GET endpoint returns due ADL tasks; both with CORS headers; env var config via `MARLIN_WEBHOOK_PORT`
+- 4 new tests: `tests/test_dashboard_api.py` (project + vault API), `tests/test_webhook_api.py` (state + adls + port env var)
 
 ### Changed
 - `webhook.py` — refactored to import `read_frontmatter` and `update_frontmatter` from `vault.py`; duplicate implementations removed
@@ -17,6 +19,7 @@
 - `webhook.py` — task actions now redirect to `/` on success (302) instead of returning plain text; better phone UX
 - `webhook.py` — Self-Care section added to Quickhacks UI: surfaces due ADL tasks as tappable done buttons; powered by `get_due_adls()`
 - `webhook.py` — `next_occurrence()`, `get_due_adls()`, `append_adl_log()` added for recurring task and ADL support
+- `project_dashboard.py` — symlinks at vault root skipped in tree walk (prevents Claude skills/ and memory/ from being listed); `_text()` responses include CORS header; `parse_qs` moved to top-level import
 
 ---
 
