@@ -103,12 +103,67 @@ RestartSec=5
 WantedBy=default.target
 EOF
 
-# ── 8. Reload systemd for the user ────────────────────────────────────
+# ── 8. Copy cockpit + write instance-specific api.js ─────────────────
+COCKPIT_SRC="/home/jared/git/cockpit"
+COCKPIT_DEST="$GIT_DIR/cockpit"
+
+if [ -d "$COCKPIT_SRC" ]; then
+  echo "--> Copying cockpit to $COCKPIT_DEST"
+  cp -r "$COCKPIT_SRC" "$COCKPIT_DEST"
+  chown -R "$USERNAME:$USERNAME" "$COCKPIT_DEST"
+
+  sudo -u "$USERNAME" tee "$COCKPIT_DEST/hooks/api.js" > /dev/null << 'APIEOF'
+// hooks/api.js — fetch wrappers, one function per endpoint
+// HOSTS is the only thing that changes between Jared's and Jason's deployments.
+
+const HOSTS = {
+  marlin:   'http://10.0.0.8:7842',
+  projects: 'http://10.0.0.8:7843',
+  ttf:      'http://10.0.0.8:3000',
+  ariel:    'http://10.0.0.78:8742',
+};
+
+function _fetch(url) {
+  return fetch(url).then(r => {
+    if (!r.ok) throw new Error(`${r.status} ${r.statusText} — ${url}`);
+    return r.json();
+  });
+}
+
+function fetchState()         { return _fetch(`${HOSTS.marlin}/api/state`); }
+function fetchTodayTasks()    { return _fetch(`${HOSTS.marlin}/tasks/today`); }
+function fetchAdls()          { return _fetch(`${HOSTS.marlin}/api/adls`); }
+function fetchProjects()      { return _fetch(`${HOSTS.projects}/api/projects`); }
+function fetchVaultTree()     { return _fetch(`${HOSTS.projects}/api/vault/tree`); }
+function fetchVaultFile(path) {
+  const url = `${HOSTS.projects}/api/vault/file?path=${encodeURIComponent(path)}`;
+  return fetch(url)
+    .then(r => {
+      if (!r.ok) throw new Error(`${r.status} ${r.statusText} — ${url}`);
+      return r.text();
+    });
+}
+function fetchTtfEvents() {
+  const d     = new Date();
+  const pad   = n => String(n).padStart(2, '0');
+  const today = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const end   = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 7);
+  const week  = `${end.getFullYear()}-${pad(end.getMonth()+1)}-${pad(end.getDate())}`;
+  return _fetch(`${HOSTS.ttf}/api/events?from=${today}&to=${week}`);
+}
+function fetchArielTurns() { return Promise.resolve([]); }  // stubbed until Ariel API confirmed
+APIEOF
+  echo "--> Wrote Jason's api.js (HOSTS → Gretchen :7842/:7843)"
+else
+  echo "WARNING: $COCKPIT_SRC not found — skipping cockpit copy"
+fi
+
+# ── 9. Reload systemd for the user ────────────────────────────────────
 sudo -u "$USERNAME" XDG_RUNTIME_DIR="/run/user/$(id -u $USERNAME)" systemctl --user daemon-reload
 
 echo ""
 echo "==> Setup complete for $USERNAME"
 echo "Next steps:"
-echo "  1. Set up Jason's Cockpit: cp -r /home/jared/git/cockpit /home/$USERNAME/git/ && chown -R $USERNAME:$USERNAME /home/$USERNAME/git/cockpit"
-echo "  2. Add WireGuard peer (see onboard_jason.sh)"
-echo "  3. Run: sudo bash $MARLIN_SRC/onboard_jason.sh"
+echo "  1. Enable + start services:"
+echo "     sudo -u $USERNAME XDG_RUNTIME_DIR=/run/user/\$(id -u $USERNAME) systemctl --user enable --now marlin-webhook.service marlin-project-dashboard.service marlin-cockpit.service"
+echo "  2. Verify: curl http://localhost:7842/api/state && curl http://localhost:7843/api/projects | head -c 100"
