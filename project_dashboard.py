@@ -1,5 +1,6 @@
 # project_dashboard.py
 import json
+import os
 import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
@@ -16,10 +17,11 @@ from vault import (
     top_task,
 )
 
-VAULT = Path("/home/jared/Documents/Obsidian/Marlin")
-TASKS_PATH = VAULT / "Tasks"
-PROJECTS_PATH = VAULT / "Projects"
-PORT = 7833
+VAULT_ROOT    = Path(os.environ.get("MARLIN_VAULT_PATH",
+                     "/home/jared/Documents/Obsidian/Marlin"))
+TASKS_PATH    = VAULT_ROOT / "Tasks"
+PROJECTS_PATH = VAULT_ROOT / "Projects"
+PORT          = int(os.environ.get("MARLIN_DASHBOARD_PORT", "7833"))
 
 
 def _build_project_core(project_path: Path, tasks_path: Path, projects_path: Path) -> dict:
@@ -109,6 +111,40 @@ def get_project_detail(slug: str, projects_path: Path, tasks_path: Path) -> dict
     return build_project_detail(path, tasks_path, projects_path)
 
 
+def build_vault_tree(vault_root: Path) -> list[dict]:
+    """Walk vault top-level dirs and their immediate children."""
+    results = []
+    for entry in sorted(vault_root.iterdir()):
+        if entry.name.startswith(".") or entry.name.startswith("_"):
+            continue
+        if entry.is_dir():
+            for child in sorted(entry.iterdir()):
+                if child.name.startswith("."):
+                    continue
+                results.append({
+                    "path": f"{entry.name}/{child.name}",
+                    "name": child.name,
+                    "folder": entry.name,
+                })
+        elif entry.suffix == ".md":
+            results.append({
+                "path": entry.name,
+                "name": entry.name,
+                "folder": "",
+            })
+    return results
+
+
+def read_vault_file(vault_root: Path, rel_path: str) -> str:
+    """Return raw content of a vault file. Raises ValueError on path traversal."""
+    resolved = (vault_root / rel_path).resolve()
+    if not resolved.is_relative_to(vault_root.resolve()):
+        raise ValueError(f"Invalid path: {rel_path}")
+    if not resolved.is_file():
+        raise FileNotFoundError(rel_path)
+    return resolved.read_text(encoding="utf-8")
+
+
 INDEX_PATH = Path(__file__).parent / "index.html"
 
 
@@ -160,6 +196,41 @@ class ProjectDashboardHandler(BaseHTTPRequestHandler):
             self._json(detail)
             return
 
+        if path == "/api/vault/tree":
+            try:
+                data = build_vault_tree(VAULT_ROOT)
+            except Exception as e:
+                self._text(500, f"Internal error: {e}")
+                return
+            self._json(data)
+            return
+
+        if path == "/api/vault/file":
+            from urllib.parse import parse_qs
+            rel = parse_qs(parsed.query).get("path", [None])[0]
+            if not rel:
+                self._text(400, "Missing path parameter")
+                return
+            try:
+                content = read_vault_file(VAULT_ROOT, rel)
+            except ValueError as e:
+                self._text(403, str(e))
+                return
+            except FileNotFoundError:
+                self._text(404, "Not found")
+                return
+            except Exception as e:
+                self._text(500, f"Internal error: {e}")
+                return
+            body = content.encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
         self._text(404, "Not found")
 
     def _json(self, data):
@@ -167,6 +238,7 @@ class ProjectDashboardHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
+        self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
         self.wfile.write(body)
 
