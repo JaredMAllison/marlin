@@ -16,11 +16,13 @@ from urllib.parse import parse_qs, quote, urlparse
 
 from vault import read_frontmatter, update_frontmatter
 
-VAULT      = Path("/home/jared/Documents/Obsidian/Marlin/Tasks")
+VAULT      = Path(os.environ.get("MARLIN_VAULT_PATH",
+                  "/home/jared/Documents/Obsidian/Marlin/Tasks"))
 INBOX_FILE = VAULT.parent / "Inbox.md"
 ADL_LOG    = VAULT.parent / "ADL-log.md"
-STATE_FILE = Path("/home/jared/marlin/state.json")
-PORT       = 7832
+STATE_FILE = Path(os.environ.get("MARLIN_STATE_FILE",
+                  "/home/jared/marlin/state.json"))
+PORT       = int(os.environ.get("MARLIN_WEBHOOK_PORT", "7832"))
 NTFY_TOPIC    = os.environ.get("MARLIN_NTFY_TOPIC", "")
 WEBHOOK_BASE  = os.environ.get("MARLIN_WEBHOOK_BASE", "http://10.0.0.8:7832")
 
@@ -398,6 +400,15 @@ def dashboard_page(current_mode: str, adls: list[dict]) -> str:
 
 class WebhookHandler(BaseHTTPRequestHandler):
 
+    def _json(self, data):
+        body = json.dumps(data, default=str).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_GET(self):
         parsed = urlparse(self.path)
         params = parse_qs(parsed.query)
@@ -437,6 +448,16 @@ class WebhookHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
+            return
+
+        # ── API: state ──
+        if action == "api/state":
+            self._json(load_state())
+            return
+
+        # ── API: ADLs ──
+        if action == "api/adls":
+            self._json(get_due_adls())
             return
 
         # ── Task actions ──
