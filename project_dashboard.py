@@ -17,8 +17,9 @@ from vault import (
     top_task,
 )
 
-VAULT_ROOT    = Path(os.environ.get("MARLIN_VAULT_PATH",
-                     "/home/jared/Documents/Obsidian/Marlin"))
+VAULT_ROOT    = Path(os.environ.get("MARLIN_VAULT_ROOT",
+                     os.environ.get("MARLIN_VAULT_PATH",
+                     "/home/jared/Documents/Obsidian/Marlin")))
 TASKS_PATH    = VAULT_ROOT / "Tasks"
 PROJECTS_PATH = VAULT_ROOT / "Projects"
 PORT          = int(os.environ.get("MARLIN_DASHBOARD_PORT", "7833"))
@@ -119,7 +120,7 @@ def build_vault_tree(vault_root: Path) -> list[dict]:
             continue
         if entry.is_dir():
             for child in sorted(entry.iterdir()):
-                if child.name.startswith("."):
+                if child.name.startswith(".") or child.name.startswith("_"):
                     continue
                 results.append({
                     "path": f"{entry.name}/{child.name}",
@@ -247,6 +248,7 @@ class ProjectDashboardHandler(BaseHTTPRequestHandler):
         self.send_response(code)
         self.send_header("Content-Type", "text/plain")
         self.send_header("Content-Length", str(len(body)))
+        self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
         self.wfile.write(body)
 
