@@ -1,5 +1,8 @@
 # Marlin
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](requirements.txt)
+
 A context-aware task surfacing engine for Obsidian vaults. Marlin reads your tasks, watches your state, and surfaces one thing at a time — at the right moment, through the least friction channel.
 
 Built for people whose executive function needs external scaffolding. Named for the fish and Merlin the wizard.
@@ -46,6 +49,19 @@ state.json         → Runtime state (mode, snooze) — not in git
 - **Ntfy** — push notifications to mobile (self-hosted or ntfy.sh)
 - **systemd** — timer and service units for automatic execution
 - **Obsidian/Markdown** — flat-file vault as the data store
+
+## Setup
+
+```bash
+git clone https://github.com/JaredMAllison/marlin.git
+cd marlin
+pip install -r requirements.txt
+echo '{"mode": "available"}' > state.json
+# Edit VAULT path and ntfy topic in marlin.py
+python marlin.py
+```
+
+See [SETUP.md](SETUP.md) for systemd integration and full configuration.
 
 ## Related repos
 
