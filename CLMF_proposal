@@ -1,0 +1,66 @@
+Project Proposal: Commons – Local Mind Foundation (C.LMF)
+Alternative name suggestion: Portable Augmentation Nexus (PAN) – lighter, more agile. C.LMF retained below for consistency.
+
+1. Executive Summary
+C.LMF proposes a worker-owned, government-backed infrastructure where every knowledge worker receives a personal AI assistant. The assistant and its learned memory (the "vault") belong to the worker, not the employer. Portability, privacy, and equitable compute access are core requirements. The system is built incrementally from a local-first MVP to a full public utility.
+
+2. Core Principles
+Agnostic of employer – The vault follows the worker across jobs.
+
+Local-first, cloud-when-needed – Privacy and offline capability by default.
+
+Orchestrator-enforced restrictions – Tool calls and permissions are not model-negotiable.
+
+Personal vault remains small (<50MB) – Public knowledge is mounted as separate read-only vaults.
+
+Equitable compute – No paid priority tiers; quotas are universal.
+
+3. Architecture Overview (Current Iteration)
+*The following describes the builder's personal implementation as of Phase 0 MVP. The framework is intentionally modular; any component can be replaced or augmented as long as the design principles (worker ownership, portability, orchestrator-enforced restrictions, equitable compute) are preserved.*
+
+Component	Current Implementation	Flexibility for Future
+Vault	Obsidian flat files with YAML frontmatter; folders: Projects, Private, Insights, ADLs. Model-agnostic root prompts.	Any file-based or lightweight database; must remain human-readable or exportable.
+Orchestrator	Python service that saves conversation turns, indexes them, assembles prompts, handles tool calls, enforces restrictions.	Can be rewritten in any language; core function is policy enforcement outside the model.
+Prosthetics	Modular tools (balloon calendar, projects board, sound customization). Called via function signatures, authorized by orchestrator.	Tool set can grow; authorization policies configurable per user or role.
+Cockpit	Web dashboard with vault visualizer, control plane, phone panel (for SMS).	Could be replaced by desktop app, CLI, or voice interface.
+Communications (optional)	VoIP/SMS via daily cipher email; quiet failure mode. Security through obfuscation for personal use.	For public deployment, replace with standard end-to-end encrypted messaging (e.g., Matrix, Signal protocol).
+Public vaults	Not yet implemented; designed as read-only, re-downloadable knowledge bases mounted separately from personal vault.	Could use IPFS, Git, or a federated repository system.
+Note: The current iteration emphasizes local-first, offline capability, and small personal vault size (<50MB). Future phases (central compute, recovery, employer-agnostic) will add components without breaking the core local vault + orchestrator pattern.
+
+4. Phased Roadmap
+Phase	Name	Deliverable	Vault Portability
+0	MVP (USB)	Local AI + local vault on one machine; installer USB with Bash/PowerShell scripts.	None (loss on device failure)
+1	Personal Vault Portability	Manual export/import via USB or cloud folder.	Manual, user-driven
+1.5	Public Vault Repository	Mountable read-only public knowledge bases; personal vault stays small.	Still manual for personal vault
+2	Central Compute (TEE)	Government-run confidential compute cluster with equal quotas.	Unchanged
+3	Full Recovery	Zero-knowledge encrypted cloud backup + in-person recovery at public facilities.	Automatic sync across devices
+4	Employer-Agnostic Funding	Employers pay into system; workers take vaults across jobs.	Full portability as right
+5. Key Differentiators vs. Commercial AI
+Aspect	Commercial AI	C.LMF
+Ownership of learned data	AI provider	Worker
+Portability across employers	None	Built-in
+Privacy	Variable, often poor	Encrypted local vault + TEE
+Tool authorization	Model-dependent	Orchestrator-enforced
+Equity	Pay for more compute	Equal quotas
+6. Immediate Next Step (Phase 0 Pilot)
+Target user: One non-technical worker (e.g., aspiring sound designer).
+
+Delivery: USB with installer; pre-configured cockpit; sound customization as prosthetic hook.
+
+Duration: 2–4 weeks.
+
+Success metric: Continued voluntary use after first hour; ability to perform daily tasks without builder hand-holding.
+
+7. Risks & Mitigations
+Risk	Mitigation
+Vault loss in Phase 0	Explicit warning; later phases add recovery.
+AI mistrust	Open source client, local auditability, no government backdoor.
+Advertiser / data seller capture	No third-party code; network-level stripping; encrypted interface.
+Hardware inequality	Phase 2 equal compute quotas; Phase 0 uses own device or cheap used laptop.
+8. Name Recommendation
+C.LMF (Commons – Local Mind Foundation) is descriptive and carries non-profit weight.
+PAN (Portable Augmentation Nexus) is offered as a shorter, more agile alternative.
+
+The builder’s current USB is Phase 0 of this proposal.
+
+

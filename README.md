@@ -1,198 +1,59 @@
 # Marlin
 
-A context-aware task surfacing engine for an Obsidian vault. Marlin reads your tasks, watches your state, and surfaces one thing at a time — at the right moment, through the least friction channel.
+A context-aware task surfacing engine for Obsidian vaults. Marlin reads your tasks, watches your state, and surfaces one thing at a time — at the right moment, through the least friction channel.
 
-Named for the fish (GUPIE lineage) and Merlin the wizard.
+Built for people whose executive function needs external scaffolding. Named for the fish and Merlin the wizard.
 
 ---
 
 ## What it does
 
-Marlin runs every 15 minutes. When you're available, it picks the highest-priority task that matches your current context and sends a notification to your phone. You tap Done, Defer, or Snooze — the vault updates automatically.
+Marlin runs every 15 minutes. When you're available, it picks the highest-priority task matching your current context and sends a push notification to your phone. Tap Done, Defer, or Snooze — the vault updates automatically.
 
 It does not surface anything during deep work. It does not batch notifications. It does not delete tasks. One thing at a time.
 
 ---
 
-## Interfaces
+## Architecture
 
-| URL | Purpose |
-|---|---|
-| `http://10.0.0.8:7832` | **Quickhack Panel** — mode switching, ADL completion, task done/defer/snooze, inbox capture. Bookmark to Android home screen. |
-| `http://10.0.0.8:7832/api/state` | Current mode/state JSON |
-| `http://10.0.0.8:7832/api/adls` | Due ADL tasks JSON |
-| `http://10.0.0.8:7833/api/projects` | Project summary JSON (P1/P2, `dashboard: true`) |
-| `http://10.0.0.8:7833/api/projects/<slug>` | Full project detail JSON (roadmap + tasks) |
-| `http://10.0.0.8:7833/api/vault/tree` | Vault folder/file tree JSON |
-| `http://10.0.0.8:7833/api/vault/file?path=...` | Raw vault file content (text/plain) |
-| `http://10.0.0.8:9100` | **Cognitive Prosthetic Cockpit** — unified HUD; OoT-style chrome; Quest/Map/Items sub-screens |
-
----
+```
+marlin.py          → Surfacing engine (systemd timer, every 15 min)
+webhook.py         → HTTP action server (Done/Defer/Snooze, mode switching, mode UI)
+vault.py           → Shared vault I/O — frontmatter read/write, task discovery
+project_dashboard.py → Project/vault API server
+state.json         → Runtime state (mode, snooze) — not in git
+```
 
 ## Modes
-
-Switch modes from the **Quickhack Panel** at `http://10.0.0.8:7832` (bookmark it to your home screen).
 
 | Mode | Behavior |
 |---|---|
 | **Available** | Surface any eligible task |
 | **Deep Work** | Surface nothing |
-| **Transit** | Surface only `any-time` + `short` tasks |
-
----
+| **Transit** | Surface only short, any-time tasks |
 
 ## Notification actions
 
-When Marlin surfaces a task you get a notification with three buttons:
-
-| Button | Effect |
+| Action | Effect |
 |---|---|
-| **Done** | Sets `status: done` + `completed: today` in the vault note |
+| **Done** | Sets `status: done` + `completed: today` |
 | **Defer** | Sets `status: deferred` + `deferred_until: tomorrow` |
 | **Snooze** | Holds the task for 2 hours, no vault write |
 
----
+## Tech stack
 
-## Task schema
+- **Python** — surfacing engine, web server, vault I/O
+- **Ntfy** — push notifications to mobile (self-hosted or ntfy.sh)
+- **systemd** — timer and service units for automatic execution
+- **Obsidian/Markdown** — flat-file vault as the data store
 
-Tasks live in `/home/jared/Documents/Obsidian/Marlin/Tasks/` as `.md` files with YAML frontmatter.
+## Related repos
 
-```yaml
----
-title: Task Title
-type: task
-status: queued
-project: "[[Project Name]]"
-goal_date: YYYY-MM-DD
-available_from: YYYY-MM-DD
-created: YYYY-MM-DD
-context: [computer, business-hours]
-duration: short
-duration_minutes: 15
-recurrence: every-friday
-tags: [task, queued]
----
-
-Optional body text.
-```
-
-### Status values
-| Value | Meaning |
-|---|---|
-| `queued` | Ready to surface |
-| `deferred` | Snoozed, re-queue later |
-| `waiting` | Blocked on external party |
-| `done` | Complete — never deleted |
-
-### Context values
-| Value | Meaning |
-|---|---|
-| `computer` | Requires desktop or laptop |
-| `phone-call` | Requires a voice call |
-| `business-hours` | Only Mon–Fri 8am–5pm Pacific |
-| `any-time` | No constraint |
-
-### Duration values
-| Value | Time |
-|---|---|
-| `short` | Under 15 min |
-| `medium` | 15–60 min |
-| `long` | Over 1 hour |
-
-### Optional fields
-- `available_from` — earliest date to surface this task (use when a task shouldn't appear until a certain date even if goal_date is later)
-- `duration_minutes` — exact estimate in minutes, for future scheduling
-- `recurrence` — `daily`, `weekly`, `biweekly`, `monthly`, `every-friday`, `every-N-days`
+- [lmf-ollama-obsidian](https://github.com/JaredMAllison/lmf-ollama-obsidian) — LLM orchestrator stack (used by Marlin as the AI conversation layer)
+- [cockpit](https://github.com/JaredMAllison/cockpit) — unified HUD for the full stack
+- [the-time-factory](https://github.com/JaredMAllison/the-time-factory) — ADHD-friendly visual calendar
+- [prosper0](https://github.com/JaredMAllison/prosper0) — work-specific exobrain instance
 
 ---
 
-## Adding tasks
-
-Use the `/marlin-capture` Claude Code skill. It prompts for all required fields and validates frontmatter before writing.
-
-```
-/marlin-capture
-```
-
-For bulk enrichment sessions (processing notes, finding connections, creating atomic notes):
-
-```
-/obsidian-enrich
-```
-
----
-
-## Vault structure
-
-```
-/home/jared/Documents/Obsidian/Marlin/
-├── Tasks/        ← one .md file per task
-├── Projects/     ← one .md file per project
-├── Daily/        ← YYYY-MM-DD.md daily notes
-└── Inbox.md      ← unprocessed capture
-```
-
----
-
-## Surfacing rules
-
-1. Mode must be `available` or `transit`
-2. Task `status` must be `queued`
-3. `available_from` must be today or earlier (if set)
-4. `business-hours` context tasks only surface Mon–Fri 8am–5pm Pacific
-5. Tasks surfaced within the last 2 hours are skipped — pick the next eligible one
-6. Sort: soonest `goal_date` first, then shortest `duration`
-7. Surface **one task only**
-
-A task will re-surface after 2 hours if ignored. Tapping Snooze also holds it for 2 hours. Tapping Done or Defer removes it from the queue permanently (until status is reset).
-
----
-
-## Files
-
-| File | Purpose |
-|---|---|
-| `marlin.py` | Surfacing engine — run by systemd timer |
-| `webhook.py` | Action server — handles Done/Defer/Snooze/mode + `/api/state` + `/api/adls`; serves Quickhacks UI at `:7832` |
-| `vault.py` | Shared vault I/O — all frontmatter read/write, task/project discovery, roadmap parsing |
-| `project_dashboard.py` | Project/vault API server at `:7833` — projects, vault tree, vault file content; reads vault via `vault.py` |
-| `setup_jason_instance.sh` | Multi-user deployment — idempotent; creates Linux user, seeds vault, installs services, copies cockpit |
-| `seed_vault.sh` | Seeds a fresh vault skeleton for a new LMF user |
-| `set-mode.sh` | CLI mode switcher (alternative to web UI) |
-| `state.json` | Runtime state — mode, snooze tracking (not in git) |
-
-### Environment variables
-
-All services read config from `.env` (loaded via `EnvironmentFile=` in systemd units) or directly from the environment.
-
-| Variable | Default | Used by |
-|---|---|---|
-| `MARLIN_VAULT_PATH` | `~/Documents/Obsidian/Marlin/Tasks` | webhook.py (Tasks dir) |
-| `MARLIN_VAULT_ROOT` | `~/Documents/Obsidian/Marlin` | project_dashboard.py (full vault) |
-| `MARLIN_WEBHOOK_PORT` | `7832` | webhook.py |
-| `MARLIN_DASHBOARD_PORT` | `7833` | project_dashboard.py |
-| `MARLIN_NTFY_TOPIC` | — | marlin.py, webhook.py |
-| `MARLIN_WEBHOOK_BASE` | `http://10.0.0.8:7832` | marlin.py (Ntfy action URLs) |
-
----
-
-## Troubleshooting
-
-**No notifications arriving:**
-- Check mode: `cat ~/marlin/state.json`
-- Run manually: `cd ~/marlin && MARLIN_NTFY_TOPIC=jared-surface-8n3p python3 marlin.py`
-- Check timer: `systemctl --user status marlin.timer`
-
-**Done/Defer not updating the vault:**
-- Check webhook: `systemctl --user status marlin-webhook.service`
-- Check logs: `journalctl --user -u marlin-webhook.service -n 20`
-
-**Wrong task surfaced:**
-- Check frontmatter on the task file — status, available_from, context
-- Run marlin.py manually to see what it picks and why
-
-**Project dashboard blank or not loading:**
-- Check service: `systemctl --user status marlin-project-dashboard.service`
-- Check logs: `journalctl --user -u marlin-project-dashboard.service -n 20`
-- Verify `index.html` is in `~/marlin/` next to `project_dashboard.py`
-- Hit the API directly to isolate frontend vs backend: `curl http://localhost:7833/api/projects`
+*Part of the Local Mind Foundation architecture. Local-first, ND-designed, operator-sovereign.*

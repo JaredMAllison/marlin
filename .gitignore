@@ -2,3 +2,5 @@ state.json
 __pycache__/
 *.pyc
 .worktrees/
+CLMF_proposal/
+.env
